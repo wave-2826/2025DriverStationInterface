@@ -1,5 +1,5 @@
 import { BLUE_FIELD_BRANCHES, BLUE_FIELD_REEF_CENTER, BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS, BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS, BRANCH_MAX_Y, BRANCH_MIN_Y, REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW, REEF_BRANCH_WIDTH } from "./fieldConstants";
-import { PathSegment, PathTransformation, Point } from "./renderTypes";
+import { Color, PathSegment, PathTransformation, Point } from "./renderTypes";
 
 let selectedBranch: string | null = "D";
 let selectedLevel: number | null = 2;
@@ -16,6 +16,21 @@ const robotLength = inchesToMeters(30);
 const robotBumperWidth = inchesToMeters(4);
 // const robotBumperBorderRadius = inchesToMeters(0.5);
 
+const BRANCH_COLOR = new Color("#a70fb9");
+const DRAW_STYLIZED = true;
+const OUTLINE_COLOR = new Color("black");
+const OUTLINE_THICKNESS = 8;
+
+const BLUE_FIELD_REEF_LINE_OUTER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_OUTER_RADIUS);
+const BLUE_FIELD_REEF_LINE_INNER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_INNER_RADIUS);
+const BLUE_FIELD_REEF_PERIMETER = createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS);
+const BLUE_FIELD_REEF_TROUGH = createReefPerimeterHexagon(BLUE_FIELD_REEF_TROUGH_RADIUS);
+
+const allReefPoints = [...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_INNER, ...BLUE_FIELD_REEF_PERIMETER, ...BLUE_FIELD_REEF_TROUGH];
+const REEF_MIN_X = Math.min(...allReefPoints.map(p => p.x));
+const REEF_MIN_Y = Math.min(...allReefPoints.map(p => p.y));
+const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
+
 /**
  * 
  * @param size The distance from the center to the hexagon's corners
@@ -31,51 +46,6 @@ function createReefPerimeterHexagon(size: number) {
     }
     return points;
 }
-
-class Color {
-    readonly r: number;
-    readonly g: number;
-    readonly b: number;
-    constructor(public from: string | [number, number, number]) {
-        if(typeof from === "string") {
-            const bigint = parseInt(from.slice(1), 16);
-            this.r = (bigint >> 16) & 255;
-            this.g = (bigint >> 8) & 255;
-            this.b = bigint & 255;
-        } else {
-            this.r = from[0];
-            this.g = from[1];
-            this.b = from[2];
-        }
-    }
-
-    get rgb() {
-        return [this.r, this.g, this.b] as const;
-    }
-
-    get rgbString() {
-        return `rgb(${this.r}, ${this.g}, ${this.b})`;
-    }
-    
-    adjustBrightness(brightness: number) {
-        return new Color([this.r * brightness, this.g * brightness, this.b * brightness]);
-    }
-}
-
-const BRANCH_COLOR = new Color("#a70fb9");
-const DRAW_STYLIZED = true;
-const OUTLINE_COLOR = new Color("black");
-const OUTLINE_THICKNESS = 8;
-
-const BLUE_FIELD_REEF_LINE_OUTER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_OUTER_RADIUS);
-const BLUE_FIELD_REEF_LINE_INNER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_INNER_RADIUS);
-const BLUE_FIELD_REEF_PERIMETER = createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS);
-const BLUE_FIELD_REEF_TROUGH = createReefPerimeterHexagon(BLUE_FIELD_REEF_TROUGH_RADIUS);
-
-const allReefPoints = [...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_INNER, ...BLUE_FIELD_REEF_PERIMETER, ...BLUE_FIELD_REEF_TROUGH];
-const REEF_MIN_X = Math.min(...allReefPoints.map(p => p.x));
-const REEF_MIN_Y = Math.min(...allReefPoints.map(p => p.y));
-const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
 
 export function drawField(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     drawReef(ctx, canvas);
@@ -352,13 +322,16 @@ function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement
     ] : REEF_BOTTOM_DRAW;
     const branchWidth = DRAW_STYLIZED ? REEF_BRANCH_WIDTH * 1.5 : REEF_BRANCH_WIDTH;
     
-    drawPath(REEF_BRANCH_DRAW, ctx, branchWidth + OUTLINE_THICKNESS / scale * 2, OUTLINE_COLOR, OUTLINE_THICKNESS, branchTransform);
-    ctx.beginPath();
-    movePolygonPath(reefBottomDraw, ctx, branchTransform);
-    ctx.closePath();
-    ctx.lineWidth = OUTLINE_THICKNESS * 2;
-    ctx.strokeStyle = OUTLINE_COLOR.rgbString;
-    ctx.stroke();
+    if(DRAW_STYLIZED) {
+        // Draw an outline before the reef
+        drawPath(REEF_BRANCH_DRAW, ctx, branchWidth + OUTLINE_THICKNESS / scale * 2, OUTLINE_COLOR, OUTLINE_THICKNESS, branchTransform);
+        ctx.beginPath();
+        movePolygonPath(reefBottomDraw, ctx, branchTransform);
+        ctx.closePath();
+        ctx.lineWidth = OUTLINE_THICKNESS * 2;
+        ctx.strokeStyle = OUTLINE_COLOR.rgbString;
+        ctx.stroke();
+    }
 
     drawPath(REEF_BRANCH_DRAW, ctx, branchWidth, BRANCH_COLOR, 1, branchTransform);
     ctx.beginPath();
