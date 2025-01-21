@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { drawField } from "../rendering";
+import { drawField } from "../lib/rendering";
 
 const canvasRef = useTemplateRef("canvas");
 let ctx: CanvasRenderingContext2D | null = null;

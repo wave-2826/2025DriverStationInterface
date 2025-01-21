@@ -2,6 +2,11 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { onMounted, useTemplateRef } from 'vue';
 
+const { tabs, activeTab } = defineProps<{
+    tabs: { name: string }[],
+    activeTab: number
+}>();
+
 const appWindow = getCurrentWindow();
 
 let closeButton = useTemplateRef("closeButton");
@@ -18,19 +23,17 @@ onMounted(() => {
 <template>
     <div data-tauri-drag-region class="titlebar">
         <div class="tabs">
-            <button class="tab">Competition</button>
-            <button class="tab">Auto routines</button>
-            <button class="tab">Settings</button>
+            <button class="tab" v-for="(tab, i) in tabs" :class="{ active: i === activeTab }" @click="$emit('updateActiveTab', i)">{{ tab.name }}</button>
         </div>
         <div class="title">Wave Robotics Driver Station Interface</div>
-        <div>
-            <button class="window-control" id="titlebar-minimize" ref="minimizeButton">
+        <div class="windowControls">
+            <button class="windowControl" ref="minimizeButton">
                 <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14H4v-4h16"/></svg>
             </button>
-            <button class="window-control" id="titlebar-maximize" ref="maximizeButton">
+            <button class="windowControl" ref="maximizeButton">
                 <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h16v16H4zm2 4v10h12V8z"/></svg>
             </button>
-            <button class="window-control" id="titlebar-close" ref="closeButton">
+            <button class="windowControl" ref="closeButton">
                 <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"/></svg>
             </button>
         </div>
@@ -39,30 +42,46 @@ onMounted(() => {
 
 <style scoped>
 .titlebar {
-    height: 24px;
+    height: 28px;
     background: #1a1a1a;
     user-select: none;
     display: flex;
     justify-content: space-between;
 }
+.titlebar > * {
+    flex: 1;
+}
 
 .title {
     font-size: 14px;
-    line-height: 24px;
+    line-height: 28px;
     padding-left: 10px;
     color: #fff;
-    line-height: 1.75;
+    pointer-events: none;
+    text-align: center;
 }
 
-.window-control {
+.windowControls {
+    display: flex;
+    justify-content: flex-end;
+}
+.windowControl {
     border: none;
+    outline: none;
     background: none;
 
     aspect-ratio: 1;
     cursor: pointer;
 
+    height: 28px;
+
     color: #ccc;
     transition: background-color 0.2s, color 0.2s;
+}
+.windowControl svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 button:hover {
     background: #2a2a2a;
@@ -84,9 +103,14 @@ button:hover {
 
     transition: background-color 0.2s, color 0.2s, margin-top 0.2s;
 }
+.tab.active {
+    background: #404040 !important;
+    color: #fff;
+    margin-top: 5px;
+}
 .tab:hover {
     background: #2a2a2a;
     color: #fff;
-    margin-top: 0px;
+    margin-top: 2px;
 }
 </style>

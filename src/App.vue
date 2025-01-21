@@ -1,15 +1,27 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import StatusBar from "./lib/StatusBar.vue";
 import TitleBar from "./lib/TitleBar.vue";
 import CompetitionTargetSelectionPage from "./pages/CompetitionTargetSelectionPage.vue";
+import AutoRoutinesPage from "./pages/AutoRoutinesPage.vue";
+import SettingsPage from "./pages/SettingsPage.vue";
+
 import "./style.css";
+
+const pages = [
+    { name: "Competition", component: CompetitionTargetSelectionPage },
+    { name: "Auto routines", component: AutoRoutinesPage },
+    { name: "Settings", component: SettingsPage }
+];
+
+let activePage = ref(0);
 </script>
 
 <template>
     <div class="layout">
-        <TitleBar />
+        <TitleBar :tabs="pages" v-bind:active-tab="activePage" @update-active-tab="activePage = $event" />
         <main class="page">
-            <CompetitionTargetSelectionPage />
+            <component :is="pages[activePage].component" />
         </main> 
         <StatusBar />
     </div>
