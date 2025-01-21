@@ -1,11 +1,14 @@
 <script setup lang="ts">
-
+import { teamNumber } from "../lib/settings";
 </script>
 
 <template>
     <div class="statusBar">
         <span>Network Tables: Disconnected</span>
-        <span>Team not set</span>
+        
+        <span v-if="teamNumber !== 0">Team {{ teamNumber }}</span>
+        <span v-else class="invalid">Team number not set!</span>
+
         <span>Latency: 0.00ms</span>
     </div>
 </template>
@@ -29,5 +32,9 @@
 }
 .statusBar span:nth-child(3) {
     text-align: right;
+}
+
+.invalid {
+    color: #ff6666;
 }
 </style>
