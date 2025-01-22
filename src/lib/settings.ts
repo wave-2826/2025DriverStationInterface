@@ -8,11 +8,11 @@ export enum IPAddressMode {
     Custom,
 };
 
+const reactiveSettings: Record<string, Ref<any>> = {};
+
 export const teamNumber = getSetting("teamNumber", 0);
 export const customIPAddress = getSetting("customIP", "127.0.0.1");
 export const ipAddressMode = getSetting("ipAddressMode", IPAddressMode.DriverStation);
-
-const reactiveSettings: Record<string, Ref<any>> = {};
 
 function getSetting<T>(key: string, defaultValue: T): Ref<T> {
   if (!reactiveSettings[key]) {

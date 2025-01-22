@@ -1,19 +1,8 @@
-import { BLUE_FIELD_BRANCHES, BLUE_FIELD_REEF_CENTER, BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS, BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS, BRANCH_MAX_Y, BRANCH_MIN_Y, REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW, REEF_BRANCH_WIDTH } from "./fieldConstants";
-import { Color, PathSegment, PathTransformation, Point } from "./renderTypes";
+import { BLUE_FIELD_BRANCHES, BLUE_FIELD_REEF_CENTER, BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS, BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS, BRANCH_MAX_Y, BRANCH_MIN_Y, REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW, REEF_BRANCH_WIDTH } from "./constants/fieldConstants";
+import { getCurrentAlliance, getRobotAngle, getRobotPosition } from "./networkTables";
+import { Color, PathSegment, PathTransformation, Point } from "./types/renderTypes";
+import { robotBumperWidth, robotLength, robotWidth } from "./constants/robotConstants";
 
-let selectedBranch: string | null = "D";
-let selectedLevel: number | null = 2;
-
-let robotPosition: Point | null = new Point(6, 3.5);
-/** The robot angle. 0 degrees is +X. */
-let robotAngle: number | null = Math.PI / 4;
-
-let currentAlliance: "red" | "blue" = "blue";
-
-const inchesToMeters = (inches: number) => inches * 0.0254;
-const robotWidth = inchesToMeters(30);
-const robotLength = inchesToMeters(30);
-const robotBumperWidth = inchesToMeters(4);
 // const robotBumperBorderRadius = inchesToMeters(0.5);
 
 const BRANCH_COLOR = new Color("#a70fb9");
@@ -30,6 +19,8 @@ const allReefPoints = [...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_IN
 const REEF_MIN_X = Math.min(...allReefPoints.map(p => p.x));
 const REEF_MIN_Y = Math.min(...allReefPoints.map(p => p.y));
 const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
+
+const getFieldLineColor = () => getCurrentAlliance() === "red" ? "#a80004" : "#0432a8";
 
 /**
  * 
@@ -153,6 +144,9 @@ function drawPolygonShaded(
 
 
 function drawRobot(ctx: CanvasRenderingContext2D, transform: PathTransformation) {
+    const robotPosition = getRobotPosition();
+    const robotAngle = getRobotAngle();
+    const currentAlliance = getCurrentAlliance();
     if(!robotPosition || !robotAngle || !currentAlliance) {
         return;
     }
@@ -238,7 +232,7 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     ctx.closePath();
     movePolygonPath(BLUE_FIELD_REEF_LINE_INNER, ctx, reefTransform);
     ctx.closePath();
-    ctx.fillStyle = "#0432a8";
+    ctx.fillStyle = getFieldLineColor();
     ctx.fill("evenodd");
     ctx.globalCompositeOperation = "source-over";
 

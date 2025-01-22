@@ -1,4 +1,28 @@
-import { Point, Branch, PathSegment } from "./renderTypes";
+import { Point, Branch, PathSegment } from "../types/renderTypes";
+
+export const fieldData = {
+    "game": "Reefscape",
+    "field-image": "2025-field.png",
+    "field-corners": {
+        "top-left": [ 534, 291 ],
+        "bottom-right": [ 3466, 1638 ]
+    },
+    "field-size": [ 57.573, 26.417 ],
+    "field-unit": "foot"
+} as const;
+
+let fieldImage: HTMLImageElement | null = null;
+export function getFieldImage(callback: (img: HTMLImageElement) => void) {
+    if(fieldImage) callback(fieldImage);
+    else {
+        const image = new Image();
+        image.onload = () => {
+            fieldImage = image;
+            callback(image);
+        };
+        image.src = fieldData["field-image"];
+    }
+}
 
 export const BLUE_FIELD_REEF_CENTER = new Point(4.489, 4.026);
 

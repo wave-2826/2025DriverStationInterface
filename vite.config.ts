@@ -1,5 +1,8 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+// TODO: Fix weird node types here
+// @ts-expect-error I don't know how to fix types in this file
+import path from "path";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -29,4 +32,11 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  resolve: {
+    alias: {
+      // @ts-expect-error I don't know how to fix types in this file
+      "@bindings": path.resolve(__dirname, "./src-tauri/bindings")
+    }
+  }
 }));
