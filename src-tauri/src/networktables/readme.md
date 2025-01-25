@@ -1,0 +1,1 @@
+A slightly adapted version of [this NetworkTables 4 client](https://github.com/wilsonwatson/nt4-rs) in Rust; also see [the official NT4 documentation](https://github.com/wpilibsuite/allwpilib/blob/main/ntcore/doc/networktables4.adoc).

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { Point } from '../lib/types/renderTypes';
+import AutoRoutine from './autoRoutines/AutoRoutine.vue';
 
 let isBlue = ref(true);
 let columnsShown = ref(2);
@@ -47,7 +48,15 @@ let columnsShown = ref(2);
             class="autos"
             :style="`gridTemplateColumns: ${'1fr '.repeat(columnsShown)}; --title-size: ${2.734 * (0.8 ** columnsShown)}rem`"
         >
-
+            <!-- <AutoRoutine
+                v-for="(auto, index) in autos"
+                :key="index"
+                :name="auto.name"
+                :isBlue="isBlue"
+                :selected="selectedAuto === auto.name"
+                :poses="auto.poses"
+            /> -->
+            <!-- TODO -->
         </div>
     </div>
 </template>

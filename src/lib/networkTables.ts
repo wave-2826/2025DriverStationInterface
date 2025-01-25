@@ -30,7 +30,7 @@ function createNTTopicRef<T>(topicPath: string, defaultValue: T, transform?: (v:
     if(NTListeners[topicPath]) return NTListeners[topicPath].ref;
     
     const state = ref(defaultValue);
-    emit("listenToTopic", topicPath);
+    emit("register_networktables_path", topicPath);
 
     NTListeners[topicPath] = {
         transform,
@@ -39,7 +39,7 @@ function createNTTopicRef<T>(topicPath: string, defaultValue: T, transform?: (v:
     return state as Ref<T>;
 }
 
-listen<NTValueUpdateMessage>('networktablesValueChanged', (event) => {
+listen<NTValueUpdateMessage>('networktables_value_changed', (event) => {
     const message = event.payload;
     const listener = NTListeners[message.topic];
     if(!listener) {
