@@ -208,10 +208,31 @@ impl NtClientThread {
             println!("Attempting to connect to NT4 server at {}...", address);
 
             let client = loop {
-                match Client::new_w_config(address, Config {
+                let c = Client::new_w_config(address, Config {
                     name: "WaveDSInterface".to_string(),
+                    on_disconnect: {
+                        let connected_boolean_2 = connected_boolean.clone();
+                        Box::new(move || Box::pin({
+                            let connected = connected_boolean_2.clone();
+                            async move {
+                                println!("Disconnected from NetworkTables server");
+                                connected.store(false, Ordering::Relaxed);
+                            }
+                        }))
+                    },
+                    on_reconnect: {
+                        let connected_boolean_2 = connected_boolean.clone();
+                        Box::new(move || Box::pin({
+                            let connected = connected_boolean_2.clone();
+                            async move {
+                                println!("Reconnected to NetworkTables server");
+                                connected.store(true, Ordering::Relaxed);
+                            }
+                        }))
+                    },
                     ..Default::default()
-                }).await {
+                }).await;
+                match c {
                     Ok(c) => break c,
                     Err(e) => {
                         eprintln!("Failed to create client: {}", e);
