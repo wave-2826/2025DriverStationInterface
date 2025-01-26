@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use networking::{register_networktables_path, update_networking_settings, NetworkingState};
 use tauri::Manager;
@@ -10,7 +10,7 @@ struct AppStateInner {
     networking_state: Option<NetworkingState>
 }
 
-type AppState = Mutex<AppStateInner>;
+type AppState = Arc<Mutex<AppStateInner>>;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,7 +25,7 @@ pub fn run() {
                 networking_state: None
             };
 
-            app.manage(Mutex::new(state));
+            app.manage::<AppState>(Arc::new(Mutex::new(state)));
             
             Ok(())
         })

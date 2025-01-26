@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
     net::SocketAddr,
-    ops::Div,
     sync::{Arc, Weak},
     time::{Duration, Instant},
 };
@@ -47,7 +46,8 @@ struct InnerClient {
     config: Config,
     // Has to be mutable to prevent overflow if it becomes too long ago
     start_time: parking_lot::Mutex<Instant>,
-    id: u32,
+    // In microseconds
+    last_latency_us: parking_lot::Mutex<u32>
 }
 
 impl Client {
@@ -68,8 +68,8 @@ impl Client {
             sub_counter: parking_lot::Mutex::new(0),
             topic_counter: parking_lot::Mutex::new(0),
             start_time: parking_lot::Mutex::new(Instant::now()),
-            config,
-            id: rand::random(),
+            last_latency_us: parking_lot::Mutex::new(0),
+            config
         });
         setup_socket(Arc::downgrade(&inner), socket_receiver, panic_sender).await?;
 
@@ -209,6 +209,41 @@ impl Client {
         Ok(Subscription { data, receiver })
     }
 
+    pub fn blocking_subscribe_w_options(
+        &self,
+        topic_names: &[impl ToString],
+        options: Option<SubscriptionOptions>,
+    ) -> Result<Subscription, Error> {
+        let topic_names: Vec<String> = topic_names.into_iter().map(ToString::to_string).collect();
+        let subuid = self.inner.new_sub_id();
+
+        // Put message in an array and serialize
+        let message = serde_json::to_string(&[NTMessage::Subscribe(Subscribe {
+            subuid,
+            topics: HashSet::from_iter(topic_names.iter().cloned()),
+            options: options.clone(),
+        })])?;
+
+        self.inner.blocking_send_message(Message::Text(message.into()));
+
+        let data = Arc::new(SubscriptionData {
+            options: options,
+            subuid,
+            topics: HashSet::from_iter(topic_names.into_iter()),
+        });
+
+        let (sender, receiver) = mpsc::channel::<MessageData>(256);
+        self.inner.subscriptions.blocking_lock().insert(
+            subuid,
+            InternalSub {
+                data: Arc::downgrade(&data),
+                sender,
+            },
+        );
+
+        Ok(Subscription { data, receiver })
+    }
+
     pub async fn unsubscribe(&self, sub: Subscription) -> Result<(), Error> {
         // Put message in an array and serialize
         let message = serde_json::to_string(&[sub.as_unsubscribe()])?;
@@ -219,6 +254,20 @@ impl Client {
             .subscriptions
             .lock()
             .await
+            .remove(&sub.data.subuid);
+
+        Ok(())
+    }
+    
+    pub fn blocking_unsubscribe(&self, sub: Subscription) -> Result<(), Error> {
+        // Put message in an array and serialize
+        let message = serde_json::to_string(&[sub.as_unsubscribe()])?;
+        self.inner.blocking_send_message(Message::Text(message.into()))?;
+
+        // Remove from our subscriptions
+        self.inner
+            .subscriptions
+            .blocking_lock()
             .remove(&sub.data.subuid);
 
         Ok(())
@@ -258,6 +307,13 @@ impl Client {
     pub async fn use_announced_topics<F: Fn(&HashMap<i32, Topic>)>(&self, f: F) {
         f(&*self.inner.announced_topics.lock().await)
     }
+
+    /// Gets the latest latency. May block to aquire the mutex.
+    pub fn get_latest_latency(&self) -> Duration {
+        return Duration::from_micros(
+            *self.inner.last_latency_us.lock() as u64
+        )
+    }
 }
 
 impl InnerClient {
@@ -278,6 +334,16 @@ impl InnerClient {
         Ok(())
     }
 
+    /// Sends a message to the websocket task in a blocking manner.
+    /// This probably shouldn't be done, but I'm tiresd of messing with async code.
+    pub(crate) fn blocking_send_message(&self, message: Message) -> Result<(), Error> {
+        self.check_task_panic()?;
+
+        // Should never be dropped before a send goes off
+        self.socket_sender.blocking_send(message);
+        Ok(())
+    }
+
     #[inline]
     pub(crate) fn client_time(&self) -> u32 {
         Instant::now()
@@ -290,23 +356,26 @@ impl InnerClient {
     }
 
     /// Takes new timestamp value and updates this client's offset
-    /// Returns `None` if the math failed
+    /// Returns `None` if the math failed; otherwise returns the latency in microseconds.
     pub(crate) fn handle_new_timestamp(
         &self,
         server_timestamp: u32,
         client_timestamp: Option<i64>,
-    ) -> Option<()> {
+    ) -> Option<u32> {
         if let Some(client_timestamp) = client_timestamp {
             let receive_time = self.client_time();
             let round_trip_time = receive_time.checked_sub(client_timestamp as u32)?;
-            let server_time_at_receive = server_timestamp.checked_sub(round_trip_time.div(2))?;
+            let latency = round_trip_time / 2;
+            let server_time_at_receive = server_timestamp.checked_sub(latency)?;
 
             // Checked sub because if start_time was too long ago, it will overflow and panic
             let offset = server_time_at_receive.checked_sub(receive_time)?;
             *self.server_time_offset.lock() = offset;
+
+            return Some(latency);
         }
 
-        Some(())
+        Some(0)
     }
 
     pub(crate) fn new_topic_id(&self) -> u32 {
@@ -553,7 +622,9 @@ async fn handle_value(array: Vec<rmpv::Value>, client: Arc<InnerClient>) {
             } else if id == -1 {
                 // Timestamp update
                 match client.handle_new_timestamp(timestamp_micros, data.as_i64()) {
-                    Some(_) => {}
+                    Some(latency) => {
+                        *client.last_latency_us.lock() = latency;
+                    }
                     None => {
                         // Math failed, update most recent time
                         *client.start_time.lock() = Instant::now();
@@ -619,9 +690,9 @@ async fn setup_socket(
     panic_sender: oneshot::Sender<Error>,
 ) -> Result<(), Error> {
     let mut request = format!(
-        "ws://{}/nt/watson-vision-{}",
+        "ws://{}/nt/{}",
         client.upgrade().ok_or(Error::Idk)?.server_addr,
-        client.upgrade().ok_or(Error::Idk)?.id,
+        client.upgrade().ok_or(Error::Idk)?.config.name,
     )
     .into_client_request()?;
     // Add sub-protocol header
@@ -697,8 +768,8 @@ async fn handle_disconnect<T>(
             .await;
 
             let mut request = format!(
-                "ws://{}/nt/rust-client-{}",
-                reconnect_client.server_addr, reconnect_client.id
+                "ws://{}/nt/{}",
+                reconnect_client.server_addr, reconnect_client.config.name
             )
             .into_client_request()?;
             // Add sub-protocol header
