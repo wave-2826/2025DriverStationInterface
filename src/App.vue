@@ -20,7 +20,7 @@ let activePage = ref(0);
 <template>
     <div class="layout">
         <TitleBar :tabs="pages" v-bind:active-tab="activePage" @update-active-tab="activePage = $event" />
-        <main class="page">
+        <main>
             <component :is="pages[activePage].component" />
         </main> 
         <StatusBar />
@@ -34,7 +34,7 @@ let activePage = ref(0);
     height: 100vh;
 }
 
-.page {
+main {
     flex: 1;
     overflow: hidden;
 }

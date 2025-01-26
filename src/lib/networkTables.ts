@@ -109,15 +109,14 @@ const stringToPoint = (s: string) => {
     return new Point(parseFloat(components[0]), parseFloat(components[1]));
 };
 
-let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "D");
-let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 2, Number);
+export let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "D");
+export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 2, Number);
 
 let robotPosition: Ref<Point> = createNTTopicRef(robotPositionPath, new Point(6, 3.5), stringToPoint);
 let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Number);
-
 let currentAlliance: Ref<AllianceColor> = createNTTopicRef(isRedAlliancePath, "red", (v) => v === "true" ? "red" : "blue");
 
-let selectedAuto = createNTTopicRef(selectedAutoPath, "None");
+export let selectedAuto = createNTTopicRef(selectedAutoPath, "None");
 
 /** Gets the currently-selected autonomous routine as a ref. */
 export function getSelectedAutoReactive(): Ref<string> {

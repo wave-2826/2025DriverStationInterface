@@ -20,6 +20,9 @@ export function getFieldImage(callback: (img: HTMLImageElement) => void) {
             fieldImage = image;
             callback(image);
         };
+        image.onerror = () => {
+            throw new Error("Failed to load field image");
+        };
         image.src = fieldData["field-image"];
     }
 }

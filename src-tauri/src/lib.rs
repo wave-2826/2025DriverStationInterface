@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use networking::{register_networktables_path, update_networking_settings, NetworkingState};
+use networking::{register_networktables_path, update_networking_settings, get_api_address, NetworkingState};
 use tauri::Manager;
 
 mod networking;
@@ -18,7 +18,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             register_networktables_path,
-            update_networking_settings
+            update_networking_settings,
+            get_api_address
         ])
         .setup(|app| {
             let state = AppStateInner {

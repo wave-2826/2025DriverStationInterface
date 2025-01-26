@@ -1,28 +1,53 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef, watch } from 'vue';
+import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue';
 import { fieldData, getFieldImage } from '../../lib/constants/fieldConstants';
 import { Point } from '../../lib/types/renderTypes';
 import { robotLength, robotWidth } from '../../lib/constants/robotConstants';
-import { AutoPose } from '../../lib/types/autoTypes';
+import { AutoRoutine } from '../../lib/types/autoTypes';
 
 const {
-    name,
     isBlue,
     selected,
-    poses
+    titleSize,
+    routine
 } = defineProps<{
-    name: string,
     isBlue: boolean,
     selected: boolean,
-    poses: AutoPose[]
+    titleSize: string,
+    routine: AutoRoutine
 }>();
-
-let showingStart = ref(true);
 
 const canvas = useTemplateRef("canvas");
 let render: (() => void) | null = null;
+watch(() => isBlue, (_) => render?.());
+watch(() => routine, (_) => render?.());
 
-watch(showingStart, (_) => render);
+let animationTime = 0;
+let animationRunning = false;
+let lastTime = 0;
+function animate() {
+    if(!animationRunning) return;
+    
+    const currentTime = Date.now();
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+
+    animationTime += deltaTime / 1000;
+    if(animationTime > routine.totalTime) animationTime = 0;
+
+    render?.();
+
+    requestAnimationFrame(animate);
+}
+
+function mouseOver() {
+    animationRunning = true;
+    lastTime = Date.now();
+    animate();
+}
+function mouseOut() {
+    animationRunning = false;
+}
 
 function rotate(cx: number, cy: number, x: number, y: number, angle: number) {
     const cos = Math.cos(angle);
@@ -82,14 +107,14 @@ onMounted(() => {
             autoCtx.clearRect(0, 0, canvasWidth, canvasHeight);
             autoCtx.drawImage(fieldImage, 0, 0, autoCanvas.width, autoCanvas.height);
             
-            autoCtx.strokeStyle = "#aaaa55";
+            autoCtx.strokeStyle = isBlue ? "#aaaaff" : "#ffaaaa";
             autoCtx.lineCap = "round";
             autoCtx.lineJoin = "round";
-            autoCtx.lineWidth = 15;
+            autoCtx.lineWidth = 10;
             autoCtx.beginPath();
             
-            for(let i = 0; i < poses.length; i++) {
-                const pathPoint = poses[i];
+            for(let i = 0; i < routine.poses.length; i++) {
+                const pathPoint = routine.poses[i];
                 const pos = fieldPosToPixelPos(pathPoint.position);
 
                 if(i === 0) autoCtx.moveTo(pos.x, pos.y);
@@ -97,54 +122,129 @@ onMounted(() => {
             }
             autoCtx.stroke();
 
-            if(showingStart) {
-                autoCtx.strokeStyle = "#bb5555";
-                const lineWidth = 15;
-                autoCtx.lineWidth = lineWidth;
-                autoCtx.beginPath();
-                
-                const center = poses[0].position;
-                const rotation = -poses[0].rotation; // Radians
+            autoCtx.strokeStyle = isBlue ? "#5555bb" : "#bb5555";
+            const lineWidth = 15;
+            autoCtx.lineWidth = lineWidth;
+            autoCtx.beginPath();
+            
+            // Display the current robot position
+            const currentPose = routine.getPoseAtTime(animationTime);
+            const center = currentPose.position;
+            const rotation = -currentPose.rotation; // Radians
 
-                const lineWidthMeters = lineWidth / autoCanvas.width * fieldWidth;
-                const length = robotLength / 2 - lineWidthMeters / 2;
-                const width = robotWidth / 2 - lineWidthMeters / 2;
-                const points = [
-                    fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: width })),
-                    fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: -width })),
-                    fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: -width })),
-                    fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: width }))
-                ];
-                autoCtx.moveTo(points[0].x, points[0].y);
-                for(let i = 0; i < points.length; i++) {
-                    autoCtx.lineTo(points[i].x, points[i].y);
-                }
-                autoCtx.lineTo(points[0].x, points[0].y);
-                autoCtx.stroke();
+            const lineWidthMeters = lineWidth / autoCanvas.width * fieldWidth;
+            const length = robotLength / 2 - lineWidthMeters / 2;
+            const width = robotWidth / 2 - lineWidthMeters / 2;
+            const points = [
+                fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: width })),
+                fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: -width })),
+                fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: -width })),
+                fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: width }))
+            ];
+            autoCtx.moveTo(points[0].x, points[0].y);
+            for(let i = 0; i < points.length; i++) {
+                autoCtx.lineTo(points[i].x, points[i].y);
             }
+            autoCtx.lineTo(points[0].x, points[0].y);
+            autoCtx.stroke();
         };
 
         render();
     });
+
+    autoCanvas.addEventListener("mouseover", mouseOver);
+    autoCanvas.addEventListener("mouseout", mouseOut);
+});
+
+onUnmounted(() => {
+    const autoCanvas = canvas.value;
+    if(autoCanvas) {
+        autoCanvas.removeEventListener("mouseover", mouseOver);
+        autoCanvas.removeEventListener("mouseout", mouseOut);
+    }
 });
 </script>
 
 <template>
     <div class="auto" :class="selected ? 'selected' : ''">
-        <span>
-            {{ name }}
+        <span class="title">
+            {{ routine.name }}
             <span class="selectedText">(Selected)</span>
         </span>
         <canvas ref="canvas"></canvas>
-        <div class="buttons">
-            <button class="displaystart" @click="showingStart = !showingStart">
-                {{ showingStart ? "Hide start" : "Display start" }}
-            </button>
-            <button class="selectpath">Select path</button>
+        <div class="options">
+            <span class="time">Duration: {{ routine.totalTime.toFixed(1) }}s</span>
+            <button class="selectPath">Select path</button>
         </div>
     </div>
 </template>
 
 <style scoped>
 
+.auto {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0.5rem;
+    padding: 0.5rem;
+    background-color: #3e3e3e;
+    border-radius: 0.5rem;
+}
+.selected {
+    background-color: #2c492c;
+}
+
+.title {
+    font-size: v-bind('titleSize');
+    margin: 0.5rem;
+}
+.selectedText {
+    font-size: calc(v-bind('titleSize') * 0.6);
+    color: #7fcc7f;
+    margin-left: 1rem;
+    display: none;
+}
+.selected .selectedText {
+    display: inline;
+}
+
+.options {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+.time {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin: 0 1rem;
+    color: #eee;
+}
+button {
+    flex: 1;
+    outline: none;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    padding: 0.5rem;
+    width: 10rem;
+}
+button.displayStart {
+    background-color: #855585;
+}
+button.displayStart:hover {
+    background-color: #9c649c;
+}
+button.displayStart:active {
+    background-color: #b172b1;
+}
+button.selectPath {
+    background-color: #497449;
+}
+button.selectPath:hover {
+    background-color: #558a55;
+}
+button.selectPath:active {
+    background-color: #63a063;
+}
 </style>

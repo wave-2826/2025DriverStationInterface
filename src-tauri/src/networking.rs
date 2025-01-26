@@ -9,6 +9,8 @@ use simple_mdns::sync_discovery::OneShotMdnsResolver;
 
 use crate::{networktables::{Client, Config, Subscription, SubscriptionOptions}, AppState};
 
+static NT_API_PORT: u16 = 5809;
+
 #[derive(TS, Serialize, Deserialize, Clone)]
 #[ts(export)]
 pub struct NTValueUpdateMessage {
@@ -42,7 +44,6 @@ pub struct NTRegisterPathMessage {
 #[ts(export)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum IPAddressMode {
-    DriverStation,
     TeamNumber,
     #[allow(non_camel_case_types)]
     mDNS,
@@ -85,10 +86,7 @@ impl IPAddressMode {
             },
             IPAddressMode::mDNS => resolve_mdns(team_number),
             IPAddressMode::Custom(ip) => ip.parse::<SocketAddr>()
-                .map_err(|_| "Invalid IP address".to_string()),
-            IPAddressMode::DriverStation => Ok(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(42, 42, 42, 42), 5810 // 5811 for secure connections
-            )))
+                .map_err(|_| "Invalid IP address".to_string())
         }
     }
 }
@@ -103,7 +101,6 @@ pub struct NetworkSettingsUpdateMessage {
 
 fn verify_ip_address_mode(ip_address_mode: &IPAddressMode) -> bool {
     match ip_address_mode {
-        IPAddressMode::DriverStation => true,
         IPAddressMode::TeamNumber => true,
         IPAddressMode::mDNS => true,
         IPAddressMode::Localhost => true,
@@ -383,6 +380,28 @@ pub async fn update_networking_settings(
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_api_address(
+    state: tauri::State<'_, AppState>
+) -> Result<String, String> {
+    let state = &state.lock().unwrap().networking_state;
+    if state.is_none() {
+        return Err("Networking not initialized".to_string());
+    }
+
+    let state = state.as_ref().unwrap();
+    let mut addr = match state.ip_address_mode.get_ip_address(state.team_number) {
+        Err(e) => {
+            eprintln!("Failed to get NTAddr: {}", e);
+            return Err("Failed to get NTAddr".to_string());
+        },
+        Ok(v) => v
+    };
+
+    addr.set_port(NT_API_PORT);
+
+    return Ok(addr.to_string());
+}
 
 #[tauri::command]
 pub async fn register_networktables_path(
