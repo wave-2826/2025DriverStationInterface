@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { teamNumber } from "../lib/settings";
+import { connected, latency_seconds as latencySeconds } from "./networkTables";
 </script>
 
 <template>
     <div class="statusBar">
-        <span>Network Tables: Disconnected</span>
+        <span>Network Tables: {{ connected ? "Connected" : "Disconnected" }}</span>
         
         <span v-if="teamNumber !== 0">Team {{ teamNumber }}</span>
         <span v-else class="invalid">Team number not set!</span>
 
-        <span>Latency: 0.00ms</span>
+        <span>Latency: {{ (latencySeconds * 1000).toFixed(2) }}ms</span>
     </div>
 </template>
 

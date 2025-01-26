@@ -2132,17 +2132,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "no-panic"
-version = "0.1.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f7da86466fe446079286ef4b2f6d789755b610a9d85da8477633f734d2697e8"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4531,7 +4520,6 @@ name = "wave-driver-station-interface"
 version = "0.1.0"
 dependencies = [
  "futures-util",
- "no-panic",
  "parking_lot",
  "rand 0.8.5",
  "rmp",

@@ -16,6 +16,7 @@ pub struct Config {
     /// Called when there is an error with the websocket and `should_reconnect` returns true
     pub on_disconnect: Box<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>,
     pub on_reconnect: Box<dyn Fn() -> BoxFuture<'static, ()> + Send + Sync>,
+    pub name: String,
 }
 
 impl Debug for Config {
@@ -36,6 +37,7 @@ impl Default for Config {
             on_un_announce: Box::new(|_| Box::pin(async {})),
             on_disconnect: Box::new(|| Box::pin(async {})),
             on_reconnect: Box::new(|| Box::pin(async {})),
+            name: format!("rust-client-{}", rand::random::<u16>())
         }
     }
 }
