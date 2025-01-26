@@ -74,7 +74,7 @@ const selectedLevelPath = "/todo/SelectedLevel";
 const robotPositionPath = "/todo/RobotPosition";
 const robotAnglePath = "/todo/RobotAngle";
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
-const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
+const selectedAutoPath = "/NetworkInputs/SmartDashboard/Auto Choices";
 
 const NTListeners: Record<string, {
     transform?: (v: string) => any,
