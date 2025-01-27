@@ -5,6 +5,7 @@ import { IPAddressMode as BackendIPAddressMode } from "@bindings/IPAddressMode";
 import { NetworkSettingsUpdateMessage } from "@bindings/NetworkSettingsUpdateMessage";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { NTUpdateMessage } from "@bindings/NTUpdateMessage";
+import { NTSetValueMessage } from "@bindings/NTSetValueMessage";
 import { NTRegisterPathMessage } from "@bindings/NTRegisterPathMessage";
 import { customIPAddress, IPAddressMode, ipAddressMode, teamNumber } from "./settings";
 
@@ -24,7 +25,6 @@ function updateNetworking() {
   
     // I'm not a huge fan of this, but it works for now.
     const mode: BackendIPAddressMode = ({
-        [IPAddressMode.DriverStation]: { type: "driverStation" },
         [IPAddressMode.TeamNumber]: { type: "teamNumber" },
         [IPAddressMode.mDNS]: { type: "mDNS" },
         [IPAddressMode.Localhost]: { type: "localhost" },
@@ -74,7 +74,7 @@ const selectedLevelPath = "/todo/SelectedLevel";
 const robotPositionPath = "/todo/RobotPosition";
 const robotAnglePath = "/todo/RobotAngle";
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
-const selectedAutoPath = "/NetworkInputs/SmartDashboard/Auto Choices";
+const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
 
 const NTListeners: Record<string, {
     transform?: (v: string) => any,
@@ -117,6 +117,14 @@ let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Numb
 let currentAlliance: Ref<AllianceColor> = createNTTopicRef(isRedAlliancePath, "red", (v) => v === "true" ? "red" : "blue");
 
 export let selectedAuto = createNTTopicRef(selectedAutoPath, "None");
+
+/** Sets the currently-selected autonomous routine. */
+export function setSelectedAuto(auto: string) {
+    send<NTSetValueMessage>("set_networktables_value", {
+        topic: selectedAutoPath,
+        value: auto
+    });
+}
 
 /** Gets the currently-selected autonomous routine as a ref. */
 export function getSelectedAutoReactive(): Ref<string> {

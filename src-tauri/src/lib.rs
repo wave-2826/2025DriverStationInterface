@@ -1,7 +1,8 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use networking::{register_networktables_path, update_networking_settings, get_api_address, NetworkingState};
+use networking::{get_api_address, register_networktables_path, set_networktables_value, update_networking_settings, NetworkingState};
 use tauri::Manager;
+use tokio::sync::Mutex;
 
 mod networking;
 mod networktables;
@@ -19,6 +20,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             register_networktables_path,
             update_networking_settings,
+            set_networktables_value,
             get_api_address
         ])
         .setup(|app| {

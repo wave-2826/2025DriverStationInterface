@@ -209,41 +209,6 @@ impl Client {
         Ok(Subscription { data, receiver })
     }
 
-    pub fn blocking_subscribe_w_options(
-        &self,
-        topic_names: &[impl ToString],
-        options: Option<SubscriptionOptions>,
-    ) -> Result<Subscription, Error> {
-        let topic_names: Vec<String> = topic_names.into_iter().map(ToString::to_string).collect();
-        let subuid = self.inner.new_sub_id();
-
-        // Put message in an array and serialize
-        let message = serde_json::to_string(&[NTMessage::Subscribe(Subscribe {
-            subuid,
-            topics: HashSet::from_iter(topic_names.iter().cloned()),
-            options: options.clone(),
-        })])?;
-
-        self.inner.blocking_send_message(Message::Text(message.into()));
-
-        let data = Arc::new(SubscriptionData {
-            options: options,
-            subuid,
-            topics: HashSet::from_iter(topic_names.into_iter()),
-        });
-
-        let (sender, receiver) = mpsc::channel::<MessageData>(256);
-        self.inner.subscriptions.blocking_lock().insert(
-            subuid,
-            InternalSub {
-                data: Arc::downgrade(&data),
-                sender,
-            },
-        );
-
-        Ok(Subscription { data, receiver })
-    }
-
     pub async fn unsubscribe(&self, sub: Subscription) -> Result<(), Error> {
         // Put message in an array and serialize
         let message = serde_json::to_string(&[sub.as_unsubscribe()])?;
@@ -254,20 +219,6 @@ impl Client {
             .subscriptions
             .lock()
             .await
-            .remove(&sub.data.subuid);
-
-        Ok(())
-    }
-    
-    pub fn blocking_unsubscribe(&self, sub: Subscription) -> Result<(), Error> {
-        // Put message in an array and serialize
-        let message = serde_json::to_string(&[sub.as_unsubscribe()])?;
-        self.inner.blocking_send_message(Message::Text(message.into()))?;
-
-        // Remove from our subscriptions
-        self.inner
-            .subscriptions
-            .blocking_lock()
             .remove(&sub.data.subuid);
 
         Ok(())
@@ -286,7 +237,29 @@ impl Client {
                 timestamp,
                 value,
             )
-            .await
+            .await?;
+
+        // If we're subscribed to this topic, send an update for the new value
+        self.inner.subscriptions.lock().await.retain(|_, sub| {
+            if !sub.is_valid() {
+                false
+            } else {
+                if sub.matches_published_topic(topic) {
+                    sub.sender
+                        .try_send(MessageData {
+                            topic_name: topic.name.clone(),
+                            timestamp,
+                            r#type: topic.r#type.clone(),
+                            data: value.to_owned(),
+                        })
+                        .is_ok()
+                } else {
+                    true
+                }
+            }
+        });
+
+        Ok(())
     }
 
     /// Value should match topic type
@@ -301,7 +274,29 @@ impl Client {
                 topic.r#type,
                 value,
             )
-            .await
+            .await?;
+
+        // If we're subscribed to this topic, send an update for the new value
+        self.inner.subscriptions.lock().await.retain(|_, sub| {
+            if !sub.is_valid() {
+                false
+            } else {
+                if sub.matches_published_topic(topic) {
+                    sub.sender
+                        .try_send(MessageData {
+                            topic_name: topic.name.clone(),
+                            timestamp: self.inner.server_time(),
+                            r#type: topic.r#type.clone(),
+                            data: value.to_owned(),
+                        })
+                        .is_ok()
+                } else {
+                    true
+                }
+            }
+        });
+
+        Ok(())
     }
 
     pub async fn use_announced_topics<F: Fn(&HashMap<i32, Topic>)>(&self, f: F) {
@@ -333,17 +328,7 @@ impl InnerClient {
         self.socket_sender.send(message).await?;
         Ok(())
     }
-
-    /// Sends a message to the websocket task in a blocking manner.
-    /// This probably shouldn't be done, but I'm tiresd of messing with async code.
-    pub(crate) fn blocking_send_message(&self, message: Message) -> Result<(), Error> {
-        self.check_task_panic()?;
-
-        // Should never be dropped before a send goes off
-        self.socket_sender.blocking_send(message);
-        Ok(())
-    }
-
+    
     #[inline]
     pub(crate) fn client_time(&self) -> u32 {
         Instant::now()
@@ -825,6 +810,15 @@ impl UnsignedIntOrNegativeOne {
         match self {
             Self::NegativeOne => rmp::encode::write_i32(wr, -1),
             Self::UnsignedInt(u_int) => rmp::encode::write_u32(wr, *u_int),
+        }
+    }
+}
+
+impl Into<i32> for UnsignedIntOrNegativeOne {
+    fn into(self) -> i32 {
+        match self {
+            Self::NegativeOne => -1,
+            Self::UnsignedInt(u_int) => u_int as i32,
         }
     }
 }

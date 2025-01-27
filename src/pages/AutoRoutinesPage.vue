@@ -61,7 +61,7 @@ onMounted(() => {
 <template>
     <div class="page">
         <div class="top">
-            <h1>Autonomous routines</h1>
+            <h1>Selected routine: {{ selectedAuto }}</h1>
             <div>
                 <button @click="fetchAutoData" class="refresh">Refresh</button>
                 <button class="sideButton" @click="isBlue = !isBlue">

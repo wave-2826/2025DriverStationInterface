@@ -1,19 +1,25 @@
 use std::{net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4}, sync::{atomic::{AtomicBool, Ordering}, Arc}, time::Duration};
 
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
-use tokio::{select, task::JoinHandle, time, sync::RwLock};
+use tokio::{select, sync::{Mutex, RwLock}, task::JoinHandle, time};
 use ts_rs::TS;
 use simple_mdns::sync_discovery::OneShotMdnsResolver;
 
-use crate::{networktables::{Client, Config, Subscription, SubscriptionOptions}, AppState};
+use crate::{networktables::{self, Client, Config, Subscription, SubscriptionOptions}, AppState};
 
 static NT_API_PORT: u16 = 5809;
 
 #[derive(TS, Serialize, Deserialize, Clone)]
 #[ts(export)]
 pub struct NTValueUpdateMessage {
+    topic: String,
+    value: String
+}
+
+#[derive(TS, Serialize, Deserialize, Clone)]
+#[ts(export)]
+pub struct NTSetValueMessage {
     topic: String,
     value: String
 }
@@ -85,8 +91,10 @@ impl IPAddressMode {
                 )));
             },
             IPAddressMode::mDNS => resolve_mdns(team_number),
-            IPAddressMode::Custom(ip) => ip.parse::<SocketAddr>()
-                .map_err(|_| "Invalid IP address".to_string())
+            IPAddressMode::Custom(ip) => Ok(SocketAddr::V4(SocketAddrV4::new(
+                ip.parse::<Ipv4Addr>().map_err(|e| format!("Failed to parse IP address: {}", e))?,
+                5810
+            ))),
         }
     }
 }
@@ -158,27 +166,27 @@ impl NtClientThread {
         self.subscription = subscription;
     }
 
-    pub fn set_subscribed_topics(self: &mut Self, topics: &Vec<String>) -> Result<(), String> {
+    pub async fn set_subscribed_topics(self: &mut Self, topics: &Vec<String>) -> Result<(), String> {
         self.subscribed_topics.clone_from(topics);
         
-        let client = self.client.blocking_read();
+        let client = self.client.read().await;
         if let Some(client) = client.as_ref() {
-            if let Some(sub) = self.subscription.blocking_write().take() {
-                if let Err(e) = client.blocking_unsubscribe(sub) {
+            if let Some(sub) = self.subscription.write().await.take() {
+                if let Err(e) = client.unsubscribe(sub).await {
                     eprintln!("Failed to ubsubscribe from active topics: {}", e);
                     return Ok(());
                 }
             }
 
-            let new_subscription = client.blocking_subscribe_w_options(&topics, Some(SubscriptionOptions {
+            let new_subscription = client.subscribe_w_options(&topics, Some(SubscriptionOptions {
                 ..Default::default()
-            }));
+            })).await;
 
             if let Err(e) = new_subscription {
                 return Err(format!("Failed to subscribe to topics: {}", e));
             }
 
-            *self.subscription.blocking_write() = Some(new_subscription.unwrap());
+            *self.subscription.write().await = Some(new_subscription.unwrap());
 
             return Ok(());
         }
@@ -308,7 +316,10 @@ impl NtClientThread {
 
                         match channel.send(NTUpdateMessage::ValueUpdate(NTValueUpdateMessage {
                             topic: message.topic_name,
-                            value: message.data.to_string()
+                            value: match message.data {
+                                rmpv::Value::String(s) => s.into_str().unwrap_or("".to_string()),
+                                _ => message.data.to_string()
+                            }
                         })) {
                             Ok(_) => {},
                             Err(_) => {
@@ -338,7 +349,7 @@ pub async fn update_networking_settings(
     payload: NetworkSettingsUpdateMessage,
     update: Channel<NTUpdateMessage>
 ) -> Result<(), String> {
-    let state = &mut state.lock().unwrap().networking_state;
+    let state = &mut state.lock().await.networking_state;
 
     if !verify_ip_address_mode(&payload.ip_address_mode) {
         eprintln!("Invalid IP address mode: {:?}", payload.ip_address_mode);
@@ -369,22 +380,22 @@ pub async fn update_networking_settings(
         let state = state.as_mut().unwrap();
         state.ip_address_mode = payload.ip_address_mode;
         state.team_number = payload.team_number;
-        state.nt_client.lock().change_ip(addr);
+        state.nt_client.lock().await.change_ip(addr);
     }
 
     println!("Networking settings updated: {:?}", state);
     
     let nt_client = &mut state.as_mut().unwrap().nt_client;
-    nt_client.lock().run_nt_updates_with_channel(update);
+    nt_client.lock().await.run_nt_updates_with_channel(update);
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_api_address(
+pub async fn get_api_address(
     state: tauri::State<'_, AppState>
 ) -> Result<String, String> {
-    let state = &state.lock().unwrap().networking_state;
+    let state = &state.lock().await.networking_state;
     if state.is_none() {
         return Err("Networking not initialized".to_string());
     }
@@ -408,12 +419,17 @@ pub async fn register_networktables_path(
     state: tauri::State<'_, AppState>,
     payload: NTRegisterPathMessage
 ) -> Result<(), String> {
-    let networking_state = &mut state.lock().unwrap().networking_state;
+    let networking_state = &mut state.lock().await.networking_state;
     if networking_state.is_none() {
         eprintln!("Attempted to register NetworkTables path {} before initializing networking!", payload.path);
         return Err("Attempted to register NetworkTables path before initializing networking!".to_string());
     }
     let networking_state = networking_state.as_mut().unwrap();
+
+    // If we're already registered, don't do anything.
+    if networking_state.registered_topics.contains(&payload.path) {
+        return Ok(());
+    }
 
     println!("Registering NetworkTables path {}", payload.path);
     networking_state.registered_topics.push(payload.path);
@@ -424,14 +440,52 @@ pub async fn register_networktables_path(
     let nt_client = networking_state.nt_client.clone();
     let registered_topics = networking_state.registered_topics.clone();
 
-    std::thread::spawn(move || {
-        match nt_client.lock().set_subscribed_topics(&registered_topics) {
-            Err(e) => {
-                eprintln!("Failed to set subscribed topics: {}", e);
-            }
-            Ok(_) => {}
+    match nt_client.lock().await.set_subscribed_topics(&registered_topics).await {
+        Err(e) => {
+            eprintln!("Failed to set subscribed topics: {}", e);
         }
-    });
+        Ok(_) => {}
+    }
     
     return Ok(());
+}
+
+/// Sets a NetworkTables value.
+/// Currently only supports strings.
+#[tauri::command]
+pub async fn set_networktables_value(
+    state: tauri::State<'_, AppState>,
+    payload: NTSetValueMessage
+) -> Result<(), String> {
+    let networking_state = &mut state.lock().await.networking_state;
+    if networking_state.is_none() {
+        eprintln!("Attempted to set NetworkTables value {} before initializing networking!", payload.topic);
+        return Err("Attempted to set NetworkTables value before initializing networking!".to_string());
+    }
+    let networking_state = networking_state.as_mut().unwrap();
+
+    let nt_client = networking_state.nt_client.lock().await;
+    let client = nt_client.client.read().await;
+
+    if let Some(client) = client.as_ref() {
+        let published_topic = match client.publish_topic(payload.topic, networktables::Type::String, None).await {
+            Ok(t) => t,
+            Err(e) => return Err(format!("Failed to publish NetworkTables topic: {}", e))
+        };
+
+        let value = rmpv::Value::String(payload.value.into());
+
+        match client.publish_value(&published_topic, &value).await {
+            Ok(_) => {},
+            Err(e) => return Err(format!("Failed to set NetworkTables value: {}", e))
+        };
+        
+        // We immediately unpublish the topic since we just want to set the value.
+        match client.unpublish(published_topic).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("Failed to unpublish NetworkTables topic: {}", e))
+        }
+    } else {
+        Err("NetworkTables client not initialized".to_string())
+    }
 }

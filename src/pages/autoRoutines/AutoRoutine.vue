@@ -4,6 +4,7 @@ import { fieldData, getFieldImage } from '../../lib/constants/fieldConstants';
 import { Point } from '../../lib/types/renderTypes';
 import { robotLength, robotWidth } from '../../lib/constants/robotConstants';
 import { AutoRoutine } from '../../lib/types/autoTypes';
+import { setSelectedAuto } from '../../lib/networkTables';
 
 const {
     isBlue,
@@ -174,7 +175,7 @@ onUnmounted(() => {
         <canvas ref="canvas"></canvas>
         <div class="options">
             <span class="time">Duration: {{ routine.totalTime.toFixed(1) }}s</span>
-            <button class="selectPath">Select path</button>
+            <button class="selectPath" @click="setSelectedAuto(routine.name)">Select path</button>
         </div>
     </div>
 </template>
@@ -189,9 +190,9 @@ onUnmounted(() => {
     padding: 0.5rem;
     background-color: #3e3e3e;
     border-radius: 0.5rem;
-}
-.selected {
-    background-color: #2c492c;
+
+    outline: 2px solid transparent;
+    transition: outline-color 0.1s;
 }
 
 .title {
@@ -200,12 +201,20 @@ onUnmounted(() => {
 }
 .selectedText {
     font-size: calc(v-bind('titleSize') * 0.6);
+    line-height: 0;
     color: #7fcc7f;
     margin-left: 1rem;
-    display: none;
+
+    display: inline;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.selected {
+    outline-color: #7fcc7f;
 }
 .selected .selectedText {
-    display: inline;
+    opacity: 1;
 }
 
 .options {

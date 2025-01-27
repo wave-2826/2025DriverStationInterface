@@ -7,7 +7,7 @@ use futures_util::Stream;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use super::{message_type::Type, topic::Topic};
+use super::{message_type::Type, topic::Topic, PublishedTopic};
 use super::messages::{NTMessage, Unsubscribe};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +58,27 @@ impl InternalSub {
     }
 
     pub(crate) fn matches_topic(&self, topic: &Topic) -> bool {
+        if let Some(data) = self.data.upgrade() {
+            let prefix = data
+                .options
+                .as_ref()
+                .and_then(|options| options.prefix)
+                .unwrap_or(false);
+
+            if prefix {
+                data.topics
+                    .iter()
+                    .any(|topic_pat| topic.name.starts_with(topic_pat))
+            } else {
+                data.topics
+                    .iter()
+                    .any(|topic_name| *topic_name == topic.name)
+            }
+        } else {
+            false
+        }
+    }
+    pub(crate) fn matches_published_topic(&self, topic: &PublishedTopic) -> bool {
         if let Some(data) = self.data.upgrade() {
             let prefix = data
                 .options
