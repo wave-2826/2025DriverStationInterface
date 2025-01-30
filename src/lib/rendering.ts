@@ -392,14 +392,16 @@ function getBranchTransform(canvas: HTMLCanvasElement): PathTransformation {
 
 function getReefTransform(canvas: HTMLCanvasElement): PathTransformation {
     const bounds = getReefBounds();
+    const rotateViewpoint = getCurrentAlliance() === "red";
 
     const REEF_MARGIN = 0.2;
     const scale = canvas.height * (1 - REEF_MARGIN * 2) / (bounds.maxX - bounds.minX);
     return {
         pointToScreenSpace(point) {
             return new Point(
-                canvas.width * 0.8 - (point.y - bounds.minY) * scale,
-                canvas.height - (point.x - bounds.minX) * scale - canvas.height * REEF_MARGIN
+                canvas.width * 0.8 - (rotateViewpoint ? (bounds.maxY - point.y) : (point.y - bounds.minY)) * scale,
+                canvas.height - (rotateViewpoint ? (bounds.maxX - point.x) : (point.x - bounds.minX))
+                    * scale - canvas.height * REEF_MARGIN
             );
         },
         lengthToScreenSpace(length) {
