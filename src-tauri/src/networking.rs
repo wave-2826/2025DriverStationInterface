@@ -127,7 +127,7 @@ struct NtClientThread {
     thread: JoinHandle<()>,
     nt_updates_thread: Option<JoinHandle<()>>,
     client: ClientLock,
-    subscribed_topics: Vec<String>,
+    subscribed_topics: Arc<RwLock<Vec<String>>>,
     subscription: SubscriptionLock,
     connected: Arc<AtomicBool>
 }
@@ -135,16 +135,17 @@ struct NtClientThread {
 impl NtClientThread {
     pub fn new(ntaddr: SocketAddr) -> Self {
         let connected = Arc::new(AtomicBool::new(false));
+        let subscribed_topics = Arc::new(RwLock::new(vec![]));
         let (thread, client, subscription) = Self::spawn_thread(
             ntaddr,
             connected.clone(),
-            vec![]
+            subscribed_topics.clone()
         );
         Self {
             thread,
             client,
             nt_updates_thread: None,
-            subscribed_topics: vec![],
+            subscribed_topics,
             subscription,
             connected
         }
@@ -167,7 +168,7 @@ impl NtClientThread {
     }
 
     pub async fn set_subscribed_topics(self: &mut Self, topics: &Vec<String>) -> Result<(), String> {
-        self.subscribed_topics.clone_from(topics);
+        *self.subscribed_topics.write().await = topics.clone();
         
         let client = self.client.read().await;
         if let Some(client) = client.as_ref() {
@@ -197,7 +198,7 @@ impl NtClientThread {
     pub fn spawn_thread(
         address: SocketAddr,
         connected_boolean: Arc<AtomicBool>,
-        subscribed_topics: Vec<String>
+        subscribed_topics: Arc<RwLock<Vec<String>>>
     ) -> (
         JoinHandle<()>,
         ClientLock,
@@ -246,12 +247,14 @@ impl NtClientThread {
                 tokio::time::sleep(Duration::from_secs(2)).await;
             };
 
+            let subscribed_topics = subscribed_topics.read().await.clone();
             if subscribed_topics.len() > 0 {
-                let subscription = client.subscribe_w_options(&subscribed_topics, Some(
-                    SubscriptionOptions {
+                let subscription = client.subscribe_w_options(
+                    &subscribed_topics,
+                    Some(SubscriptionOptions {
                         ..Default::default()
-                    }
-                )).await;
+                    })
+                ).await;
 
                 if let Err(e) = subscription {
                     eprintln!("Failed to subscribe to topics: {}", e);
@@ -260,6 +263,7 @@ impl NtClientThread {
 
                 *subscription_lock_2.write().await = Some(subscription.unwrap());
             }
+            println!("Initially subscribed to {} topics", subscribed_topics.len());
 
             client_lock_2.write().await.replace(client);
 

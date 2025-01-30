@@ -1,6 +1,11 @@
 import { selectedBranch, selectedLevel, setSelectedBranch, setSelectedLevel } from "../networkTables";
 import { Point, Branch, PathSegment, SelectionRegionData } from "../types/renderTypes";
+import { feetToMeters } from "../units";
 
+/**
+ * This is an exception to our normal rule of using distances in meters;
+ * this data is straight from WPILib, so it uses feet.
+ */
 export const fieldData = {
     "game": "Reefscape",
     "field-image": "2025-field.png",
@@ -27,6 +32,11 @@ export function getFieldImage(callback: (img: HTMLImageElement) => void) {
         image.src = fieldData["field-image"];
     }
 }
+
+export const fieldCenter = new Point(
+    feetToMeters(fieldData["field-size"][0]) / 2,
+    feetToMeters(fieldData["field-size"][1]) / 2
+);
 
 export const BLUE_FIELD_REEF_CENTER = new Point(4.489, 4.026);
 

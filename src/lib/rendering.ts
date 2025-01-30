@@ -3,6 +3,7 @@ import {
     BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS,
     BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS,
     BRANCH_MAX_Y, BRANCH_MIN_Y,
+    fieldCenter,
     REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW,
     REEF_BRANCH_SELECTIONS, REEF_BRANCH_WIDTH,
     REEF_SELECTIONS
@@ -16,18 +17,39 @@ const DRAW_STYLIZED = true;
 const OUTLINE_COLOR = new Color("black");
 const OUTLINE_THICKNESS = 8;
 
-const DEBUG_SELECTION_BOUNDARIES = false;
+const DEBUG_SELECTION_BOUNDARIES = true;
 
 const BLUE_FIELD_REEF_LINE_OUTER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_OUTER_RADIUS);
 const BLUE_FIELD_REEF_LINE_INNER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_INNER_RADIUS);
 const BLUE_FIELD_REEF_PERIMETER = createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS);
 const BLUE_FIELD_REEF_TROUGH = createReefPerimeterHexagon(BLUE_FIELD_REEF_TROUGH_RADIUS);
 
-const allReefPoints = [...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_INNER, ...BLUE_FIELD_REEF_PERIMETER, ...BLUE_FIELD_REEF_TROUGH];
-const REEF_MIN_X = Math.min(...allReefPoints.map(p => p.x));
-const REEF_MAX_X = Math.max(...allReefPoints.map(p => p.x));
-const REEF_MIN_Y = Math.min(...allReefPoints.map(p => p.y));
-// const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
+function flipForAlliance(point: Point) {
+    // The field has rotational symmetry, so we need to flip the X and Y coordinates over the center of the field.
+    if(getCurrentAlliance() === "blue") return point;
+    return new Point(
+        fieldCenter.x * 2 - point.x,
+        fieldCenter.y * 2 - point.y
+    );
+}
+
+function getReefBounds(): {
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number
+} {
+    const allReefPoints = [
+        ...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_INNER,
+        ...BLUE_FIELD_REEF_PERIMETER, ...BLUE_FIELD_REEF_TROUGH
+    ].map(flipForAlliance);
+    return {
+        minX: Math.min(...allReefPoints.map(p => p.x)),
+        maxX: Math.max(...allReefPoints.map(p => p.x)),
+        minY: Math.min(...allReefPoints.map(p => p.y)),
+        maxY: Math.max(...allReefPoints.map(p => p.y))
+    };
+}
 
 const getFieldLineColor = () => getCurrentAlliance() === "red" ? "#a80004" : "#0432a8";
 
@@ -52,15 +74,25 @@ export function mouseDown(event: MouseEvent, canvas: HTMLCanvasElement) {
 
     const reefTransform = getReefTransform(canvas);
     for(const region of reefSelections) {
-        if(region.pointInRegion(mousePosition, reefTransform)) {
+        if(region.pointInRegion(mousePosition, {
+            pointToScreenSpace(point) {
+                return reefTransform.pointToScreenSpace(flipForAlliance(point));
+            },
+            lengthToScreenSpace(length) {
+                return reefTransform.lengthToScreenSpace(length);
+            },
+            lengthToWorldSpace(length) {
+                return reefTransform.lengthToWorldSpace(length);
+            }
+        })) {
             region.onSelect();
         }
     }
 }
-export function mouseUp(event: MouseEvent, canvas: HTMLCanvasElement) {
+export function mouseUp(_event: MouseEvent, _canvas: HTMLCanvasElement) {
     isMouseDown = false;
 }
-export function mouseMove(event: MouseEvent, canvas: HTMLCanvasElement) {
+export function mouseMove(event: MouseEvent, _canvas: HTMLCanvasElement) {
     mousePosition = new Point(event.offsetX, event.offsetY);
 }
 
@@ -257,10 +289,12 @@ function drawRobot(ctx: CanvasRenderingContext2D, transform: PathTransformation)
 function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
     const reefTransform = getReefTransform(canvas);
 
+    const reefCenter = flipForAlliance(BLUE_FIELD_REEF_CENTER);
+
     ctx.beginPath();
-    movePolygonPath(BLUE_FIELD_REEF_LINE_OUTER, ctx, reefTransform);
+    movePolygonPath(BLUE_FIELD_REEF_LINE_OUTER.map(flipForAlliance), ctx, reefTransform);
     ctx.closePath();
-    movePolygonPath(BLUE_FIELD_REEF_LINE_INNER, ctx, reefTransform);
+    movePolygonPath(BLUE_FIELD_REEF_LINE_INNER.map(flipForAlliance), ctx, reefTransform);
     ctx.closePath();
     ctx.fillStyle = getFieldLineColor();
     ctx.fill("evenodd");
@@ -269,18 +303,20 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, delt
     // If drawing stylized, we add an to the reef perimiter
     if(DRAW_STYLIZED) {
         ctx.beginPath();
-        movePolygonPath(createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS + reefTransform.lengthToWorldSpace(OUTLINE_THICKNESS)), ctx, reefTransform);
+        movePolygonPath(createReefPerimeterHexagon(
+            BLUE_FIELD_REEF_PERIMETER_RADIUS + reefTransform.lengthToWorldSpace(OUTLINE_THICKNESS)
+        ).map(flipForAlliance), ctx, reefTransform);
         ctx.closePath();
         ctx.fillStyle = OUTLINE_COLOR.rgbString;
         ctx.fill();
     }
 
-    drawPolygonShaded(BLUE_FIELD_REEF_PERIMETER, BLUE_FIELD_REEF_CENTER, ctx, new Color([100, 100, 100]), reefTransform);
-    drawPolygonShaded(BLUE_FIELD_REEF_TROUGH, BLUE_FIELD_REEF_CENTER, ctx, new Color([50, 50, 50]), reefTransform);
+    drawPolygonShaded(BLUE_FIELD_REEF_PERIMETER.map(flipForAlliance), reefCenter, ctx, new Color([100, 100, 100]), reefTransform);
+    drawPolygonShaded(BLUE_FIELD_REEF_TROUGH.map(flipForAlliance), reefCenter, ctx, new Color([50, 50, 50]), reefTransform);
 
     for(const branch of BLUE_FIELD_BRANCHES) {
-        const bottom = reefTransform.pointToScreenSpace(branch.bottomPoint);
-        const top = reefTransform.pointToScreenSpace(branch.topPoint);
+        const bottom = reefTransform.pointToScreenSpace(flipForAlliance(branch.bottomPoint));
+        const top = reefTransform.pointToScreenSpace(flipForAlliance(branch.topPoint));
 
         ctx.lineCap = "round";
         if(DRAW_STYLIZED) {
@@ -324,7 +360,17 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, delt
         }
     }
     
-    drawSelectionRegions(reefSelections, ctx, reefTransform, deltaTime);
+    drawSelectionRegions(reefSelections, ctx, {
+        pointToScreenSpace(point) {
+            return reefTransform.pointToScreenSpace(flipForAlliance(point));
+        },
+        lengthToScreenSpace(length) {
+            return reefTransform.lengthToScreenSpace(length);
+        },
+        lengthToWorldSpace(length) {
+            return reefTransform.lengthToWorldSpace(length);
+        }
+    }, deltaTime);
     
     drawRobot(ctx, reefTransform);
 }
@@ -345,13 +391,15 @@ function getBranchTransform(canvas: HTMLCanvasElement): PathTransformation {
 }
 
 function getReefTransform(canvas: HTMLCanvasElement): PathTransformation {
+    const bounds = getReefBounds();
+
     const REEF_MARGIN = 0.2;
-    const scale = canvas.height * (1 - REEF_MARGIN * 2) / (REEF_MAX_X - REEF_MIN_X);
+    const scale = canvas.height * (1 - REEF_MARGIN * 2) / (bounds.maxX - bounds.minX);
     return {
         pointToScreenSpace(point) {
             return new Point(
-                canvas.width * 0.8 - (point.y - REEF_MIN_Y) * scale,
-                canvas.height - (point.x - REEF_MIN_X) * scale - canvas.height * REEF_MARGIN
+                canvas.width * 0.8 - (point.y - bounds.minY) * scale,
+                canvas.height - (point.x - bounds.minX) * scale - canvas.height * REEF_MARGIN
             );
         },
         lengthToScreenSpace(length) {

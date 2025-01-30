@@ -109,8 +109,8 @@ const stringToPoint = (s: string) => {
     return new Point(parseFloat(components[0]), parseFloat(components[1]));
 };
 
-export let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "D");
-export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 2, (level) => parseInt(level.substring(1)));
+export let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "None");
+export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 0, (level) => parseInt(level.substring(1)));
 
 let robotPosition: Ref<Point> = createNTTopicRef(robotPositionPath, new Point(6, 3.5), stringToPoint);
 let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Number);
