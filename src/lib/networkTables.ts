@@ -69,8 +69,8 @@ watch(ipAddressMode, updateNetworking);
 
 updateNetworking();
 
-const selectedBranchPath = "/todo/SelectedBranch";
-const selectedLevelPath = "/todo/SelectedLevel";
+const selectedBranchPath = "/DriverStationInterface/ReefBranch";
+const selectedLevelPath = "/DriverStationInterface/ReefLevel";
 const robotPositionPath = "/todo/RobotPosition";
 const robotAnglePath = "/todo/RobotAngle";
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
@@ -110,7 +110,7 @@ const stringToPoint = (s: string) => {
 };
 
 export let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "D");
-export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 2, Number);
+export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 2, (level) => parseInt(level.substring(1)));
 
 let robotPosition: Ref<Point> = createNTTopicRef(robotPositionPath, new Point(6, 3.5), stringToPoint);
 let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Number);
@@ -123,6 +123,22 @@ export function setSelectedAuto(auto: string) {
     send<NTSetValueMessage>("set_networktables_value", {
         topic: selectedAutoPath,
         value: auto
+    });
+}
+
+/** Sets the currently-selected branch. */
+export function setSelectedBranch(branch: string) {
+    send<NTSetValueMessage>("set_networktables_value", {
+        topic: selectedBranchPath,
+        value: branch
+    });
+}
+
+/** Sets the currently-selected level. */
+export function setSelectedLevel(level: number) {
+    send<NTSetValueMessage>("set_networktables_value", {
+        topic: selectedLevelPath,
+        value: `L${level.toString()}`
     });
 }
 

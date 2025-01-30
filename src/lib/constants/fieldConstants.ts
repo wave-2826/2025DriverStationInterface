@@ -1,4 +1,5 @@
-import { Point, Branch, PathSegment } from "../types/renderTypes";
+import { selectedBranch, selectedLevel, setSelectedBranch, setSelectedLevel } from "../networkTables";
+import { Point, Branch, PathSegment, SelectionRegionData } from "../types/renderTypes";
 
 export const fieldData = {
     "game": "Reefscape",
@@ -112,3 +113,73 @@ export const REEF_BOTTOM_DRAW = [
 
 export const BRANCH_MAX_Y = 1.809;
 export const BRANCH_MIN_Y = -0.016;
+
+export const REEF_BRANCH_SELECTIONS: SelectionRegionData[] = new Array(4).fill(null).map((_, i) => {
+    const x = -0.4;
+    const width = 1.6;
+    const height = (BRANCH_MAX_Y + 0.15 - BRANCH_MIN_Y) / 4;
+    const y = -0.016 + height * i;
+    return {
+        points: [
+            new Point(x, y),
+            new Point(x + width, y),
+            new Point(x + width, y + height),
+            new Point(x, y + height)
+        ],
+        label: `l${i+1}`,
+        labelAlign: "left",
+        labelAnimationAngle: Math.PI / 2,
+        labelSize: 0.13,
+        labelPosition: new Point(x + 0.85, y + height / 2),
+        onSelect: () => {
+            console.log(`Selected L${i + 1}`);
+            setSelectedLevel(i + 1);
+        },
+        selected: () => selectedLevel.value === i + 1
+    };  
+});
+export const REEF_SELECTIONS: SelectionRegionData[] = BLUE_FIELD_BRANCHES.map((branch, i) => {
+    let labelX = branch.topPoint.x;
+    let labelY = branch.topPoint.y;
+
+    // Extend outward from the center of the reef
+    const dx = labelX - BLUE_FIELD_REEF_CENTER.x;
+    const dy = labelY - BLUE_FIELD_REEF_CENTER.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    // TODO: Should these be inset or outset?
+    labelX += dx / dist * 0.25;
+    labelY += dy / dist * 0.25;
+
+    const angle = -i * Math.PI / 6 + 5 * Math.PI / 12;
+    // 15 degrees since the reef is a hexagon and we have two branches per side
+    const leftAngle = angle + Math.PI / 12;
+    const rightAngle = angle - Math.PI / 12;
+    
+    const selectionSurfaceRadius = 2.25;
+    const leftPoint = BLUE_FIELD_REEF_CENTER.add(new Point(
+        Math.cos(leftAngle) * selectionSurfaceRadius,
+        Math.sin(leftAngle) * selectionSurfaceRadius
+    ));
+    const rightPoint = BLUE_FIELD_REEF_CENTER.add(new Point(
+        Math.cos(rightAngle) * selectionSurfaceRadius,
+        Math.sin(rightAngle) * selectionSurfaceRadius
+    ));
+    
+    return {
+        points: [
+            BLUE_FIELD_REEF_CENTER,
+            leftPoint,
+            rightPoint
+        ],
+        label: branch.FMSIdentifier,
+        labelAlign: "center",
+        labelSize: 0.15,
+        labelAnimationAngle: -angle + Math.PI / 2,
+        labelPosition: new Point(labelX, labelY - 0.01),
+        onSelect: () => {
+            console.log(`Selected ${branch.FMSIdentifier}`);
+            setSelectedBranch(branch.FMSIdentifier);
+        },
+        selected: () => selectedBranch.value === branch.FMSIdentifier
+    } satisfies SelectionRegionData;
+});

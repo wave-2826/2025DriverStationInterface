@@ -1,14 +1,22 @@
-import { BLUE_FIELD_BRANCHES, BLUE_FIELD_REEF_CENTER, BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS, BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS, BRANCH_MAX_Y, BRANCH_MIN_Y, REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW, REEF_BRANCH_WIDTH } from "./constants/fieldConstants";
+import {
+    BLUE_FIELD_BRANCHES, BLUE_FIELD_REEF_CENTER,
+    BLUE_FIELD_REEF_LINE_INNER_RADIUS, BLUE_FIELD_REEF_LINE_OUTER_RADIUS,
+    BLUE_FIELD_REEF_PERIMETER_RADIUS, BLUE_FIELD_REEF_TROUGH_RADIUS,
+    BRANCH_MAX_Y, BRANCH_MIN_Y,
+    REEF_BOTTOM_DRAW, REEF_BRANCH_DRAW,
+    REEF_BRANCH_SELECTIONS, REEF_BRANCH_WIDTH,
+    REEF_SELECTIONS
+} from "./constants/fieldConstants";
 import { getCurrentAlliance, getRobotAngle, getRobotPosition } from "./networkTables";
-import { Color, PathSegment, PathTransformation, Point } from "./types/renderTypes";
+import { Color, PathSegment, PathTransformation, Point, SelectionRegion } from "./types/renderTypes";
 import { robotBumperWidth, robotLength, robotWidth } from "./constants/robotConstants";
-
-// const robotBumperBorderRadius = inchesToMeters(0.5);
 
 const BRANCH_COLOR = new Color("#a70fb9");
 const DRAW_STYLIZED = true;
 const OUTLINE_COLOR = new Color("black");
 const OUTLINE_THICKNESS = 8;
+
+const DEBUG_SELECTION_BOUNDARIES = false;
 
 const BLUE_FIELD_REEF_LINE_OUTER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_OUTER_RADIUS);
 const BLUE_FIELD_REEF_LINE_INNER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_INNER_RADIUS);
@@ -17,10 +25,44 @@ const BLUE_FIELD_REEF_TROUGH = createReefPerimeterHexagon(BLUE_FIELD_REEF_TROUGH
 
 const allReefPoints = [...BLUE_FIELD_REEF_LINE_OUTER, ...BLUE_FIELD_REEF_LINE_INNER, ...BLUE_FIELD_REEF_PERIMETER, ...BLUE_FIELD_REEF_TROUGH];
 const REEF_MIN_X = Math.min(...allReefPoints.map(p => p.x));
+const REEF_MAX_X = Math.max(...allReefPoints.map(p => p.x));
 const REEF_MIN_Y = Math.min(...allReefPoints.map(p => p.y));
-const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
+// const REEF_MAX_Y = Math.max(...allReefPoints.map(p => p.y));
 
 const getFieldLineColor = () => getCurrentAlliance() === "red" ? "#a80004" : "#0432a8";
+
+let reefBranchSelections: SelectionRegion[] = REEF_BRANCH_SELECTIONS.map(r => new SelectionRegion(r));
+let reefSelections: SelectionRegion[] = REEF_SELECTIONS.map(r => new SelectionRegion(r));
+
+let mousePosition: Point | null = null;
+let isMouseDown = false;
+
+export function mouseDown(event: MouseEvent, canvas: HTMLCanvasElement) {
+    isMouseDown = true;
+    mousePosition = new Point(event.offsetX, event.offsetY);
+
+    if(!mousePosition) return;
+    
+    const branchTransform = getBranchTransform(canvas);
+    for(const region of reefBranchSelections) {
+        if(region.pointInRegion(mousePosition, branchTransform)) {
+            region.onSelect();
+        }
+    }
+
+    const reefTransform = getReefTransform(canvas);
+    for(const region of reefSelections) {
+        if(region.pointInRegion(mousePosition, reefTransform)) {
+            region.onSelect();
+        }
+    }
+}
+export function mouseUp(event: MouseEvent, canvas: HTMLCanvasElement) {
+    isMouseDown = false;
+}
+export function mouseMove(event: MouseEvent, canvas: HTMLCanvasElement) {
+    mousePosition = new Point(event.offsetX, event.offsetY);
+}
 
 /**
  * 
@@ -38,9 +80,9 @@ function createReefPerimeterHexagon(size: number) {
     return points;
 }
 
-export function drawField(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-    drawReef(ctx, canvas);
-    drawReefBranch(ctx, canvas);
+export function drawField(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
+    drawReef(ctx, canvas, deltaTime);
+    drawReefBranch(ctx, canvas, deltaTime);
 }
 
 function drawPath(path: PathSegment[], ctx: CanvasRenderingContext2D, width: number, color: Color, expand: number, transform: PathTransformation, inSegments = true) {
@@ -59,7 +101,7 @@ function drawPath(path: PathSegment[], ctx: CanvasRenderingContext2D, width: num
                 if(inSegments) ctx.beginPath();
                 ctx.arc(center.x, center.y, radius, section.startAngle, section.endAngle, false);
                 if(inSegments) ctx.stroke();
-            break;
+                break;
             case "line":
                 const start = transform.pointToScreenSpace(section.start);
                 const end = transform.pointToScreenSpace(section.end);
@@ -72,7 +114,7 @@ function drawPath(path: PathSegment[], ctx: CanvasRenderingContext2D, width: num
                 if(inSegments) ctx.moveTo(start.x - dir[0], start.y - dir[1]);
                 ctx.lineTo(end.x + dir[0], end.y + dir[1]);
                 if(inSegments) ctx.stroke();
-            break;
+                break;
         }
     }
 
@@ -142,7 +184,6 @@ function drawPolygonShaded(
     }
 }
 
-
 function drawRobot(ctx: CanvasRenderingContext2D, transform: PathTransformation) {
     const robotPosition = getRobotPosition();
     const robotAngle = getRobotAngle();
@@ -182,10 +223,11 @@ function drawRobot(ctx: CanvasRenderingContext2D, transform: PathTransformation)
             );
             return transform.pointToScreenSpace(fieldPoint);
         },
-        lengthToScreenSpace: transform.lengthToScreenSpace
+        lengthToScreenSpace: transform.lengthToScreenSpace,
+        lengthToWorldSpace: transform.lengthToWorldSpace
     };
 
-    drawPath(robotPath, ctx, robotBumperWidth, new Color(currentAlliance === "red" ? "#990000" : "#000099"), 0, robotTransform, false);
+    drawPath(robotPath, ctx, robotBumperWidth * 2, new Color(currentAlliance === "red" ? "#990000" : "#000099"), 0, robotTransform, false);
     ctx.fillStyle = "#111111";
     ctx.fill();
 
@@ -212,20 +254,8 @@ function drawRobot(ctx: CanvasRenderingContext2D, transform: PathTransformation)
     ctx.fill();
 }
 
-function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-    const REEF_MARGIN = 0.15;
-    const scale = canvas.height * (1 - REEF_MARGIN * 2) / (REEF_MAX_Y - REEF_MIN_Y);
-    const reefTransform: PathTransformation = {
-        pointToScreenSpace(point) {
-            return new Point(
-                canvas.width * 0.8 - (point.x - REEF_MIN_X) * scale,
-                canvas.height - (point.y - REEF_MIN_Y) * scale - canvas.height * REEF_MARGIN
-            );
-        },
-        lengthToScreenSpace(length) {
-            return length * scale;
-        },
-    };
+function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
+    const reefTransform = getReefTransform(canvas);
 
     ctx.beginPath();
     movePolygonPath(BLUE_FIELD_REEF_LINE_OUTER, ctx, reefTransform);
@@ -239,7 +269,7 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     // If drawing stylized, we add an to the reef perimiter
     if(DRAW_STYLIZED) {
         ctx.beginPath();
-        movePolygonPath(createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS + OUTLINE_THICKNESS / scale), ctx, reefTransform);
+        movePolygonPath(createReefPerimeterHexagon(BLUE_FIELD_REEF_PERIMETER_RADIUS + reefTransform.lengthToWorldSpace(OUTLINE_THICKNESS)), ctx, reefTransform);
         ctx.closePath();
         ctx.fillStyle = OUTLINE_COLOR.rgbString;
         ctx.fill();
@@ -294,19 +324,47 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
         }
     }
     
+    drawSelectionRegions(reefSelections, ctx, reefTransform, deltaTime);
+    
     drawRobot(ctx, reefTransform);
 }
 
-function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+function getBranchTransform(canvas: HTMLCanvasElement): PathTransformation {
     const scale = canvas.height * 0.75 / (BRANCH_MAX_Y - BRANCH_MIN_Y);
-    const branchTransform: PathTransformation = {
+    return {
         pointToScreenSpace(point) {
             return new Point(point.x * scale + canvas.width * 0.1, canvas.height - point.y * scale - canvas.height * 0.1);
         },
         lengthToScreenSpace(length) {
             return length * scale;
         },
+        lengthToWorldSpace(length) {
+            return length / scale;
+        }
     };
+}
+
+function getReefTransform(canvas: HTMLCanvasElement): PathTransformation {
+    const REEF_MARGIN = 0.2;
+    const scale = canvas.height * (1 - REEF_MARGIN * 2) / (REEF_MAX_X - REEF_MIN_X);
+    return {
+        pointToScreenSpace(point) {
+            return new Point(
+                canvas.width * 0.8 - (point.y - REEF_MIN_Y) * scale,
+                canvas.height - (point.x - REEF_MIN_X) * scale - canvas.height * REEF_MARGIN
+            );
+        },
+        lengthToScreenSpace(length) {
+            return length * scale;
+        },
+        lengthToWorldSpace(length) {
+            return length / scale;
+        }
+    };
+}
+
+function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
+    const branchTransform = getBranchTransform(canvas);
 
     const reefBottomDraw: Point[] = DRAW_STYLIZED ? [
         new Point(-0.054, 0.498),
@@ -318,7 +376,7 @@ function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement
     
     if(DRAW_STYLIZED) {
         // Draw an outline before the reef
-        drawPath(REEF_BRANCH_DRAW, ctx, branchWidth + OUTLINE_THICKNESS / scale * 2, OUTLINE_COLOR, OUTLINE_THICKNESS, branchTransform);
+        drawPath(REEF_BRANCH_DRAW, ctx, branchWidth + branchTransform.lengthToWorldSpace(OUTLINE_THICKNESS) * 2, OUTLINE_COLOR, OUTLINE_THICKNESS, branchTransform);
         ctx.beginPath();
         movePolygonPath(reefBottomDraw, ctx, branchTransform);
         ctx.closePath();
@@ -333,4 +391,34 @@ function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement
     ctx.closePath();
     ctx.fillStyle = "gray";
     ctx.fill();
+
+    drawSelectionRegions(reefBranchSelections, ctx, branchTransform, deltaTime);
+}
+
+function drawSelectionRegions(regions: SelectionRegion[], ctx: CanvasRenderingContext2D, transform: PathTransformation, deltaTime: number) {
+    for(const region of regions) {
+        region.update(deltaTime, region.pointInRegion(mousePosition ?? new Point(0, 0), transform));
+        
+        if(DEBUG_SELECTION_BOUNDARIES) {
+            ctx.beginPath();
+            movePolygonPath(region.points, ctx, transform);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fill();
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = region.labelColor;
+        ctx.strokeStyle = OUTLINE_COLOR.rgbString;
+        ctx.lineWidth = 14;
+        ctx.textBaseline = "middle";
+        ctx.font = region.font(transform);
+        ctx.textAlign = region.labelAlign;
+
+        const position = region.labelPosition(transform);
+        ctx.strokeText(region.label, position.x, position.y);
+        ctx.fillText(region.label, position.x, position.y);
+    }
 }

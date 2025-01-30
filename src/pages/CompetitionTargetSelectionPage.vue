@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { drawField } from "../lib/rendering";
+import { drawField, mouseDown, mouseMove, mouseUp } from "../lib/rendering";
 
 const canvasRef = useTemplateRef("canvas");
 let ctx: CanvasRenderingContext2D | null = null;
@@ -31,9 +31,22 @@ function draw(elapsed: number) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    drawField(ctx, canvas);
+    drawField(ctx, canvas, delta);
 
     if(running) requestAnimationFrame(draw);
+}
+
+function onMouseDown(event: MouseEvent) {
+    if(!canvasRef.value) return;
+    mouseDown(event, canvasRef.value);
+}
+function onMouseMove(event: MouseEvent) {
+    if(!canvasRef.value) return;
+    mouseMove(event, canvasRef.value);
+}
+function onMouseUp(event: MouseEvent) {
+    if(!canvasRef.value) return;
+    mouseUp(event, canvasRef.value);
 }
 
 onMounted(() => {
@@ -51,12 +64,23 @@ onMounted(() => {
         return;
     }
 
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mousemove", onMouseMove);
+
     requestAnimationFrame(draw);
 });
 
 onUnmounted(() => {
     resizeObserver.disconnect();
     running = false;
+    
+    const canvas = canvasRef.value!;
+    if(canvas === null) return;
+    
+    canvas.removeEventListener("mousedown", onMouseDown);
+    canvas.removeEventListener("mouseup", onMouseUp);
+    canvas.removeEventListener("mousemove", onMouseMove);
 });
 </script>
 
