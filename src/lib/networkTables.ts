@@ -1,4 +1,4 @@
-import { Ref, ref, watch } from "vue";
+import { computed, Ref, ref, watch } from "vue";
 import { Point } from "./types/renderTypes";
 import { AllianceColor } from "./types/autoTypes";
 import { IPAddressMode as BackendIPAddressMode } from "@bindings/IPAddressMode";
@@ -71,8 +71,11 @@ updateNetworking();
 
 const selectedBranchPath = "/DriverStationInterface/ReefBranch";
 const selectedLevelPath = "/DriverStationInterface/ReefLevel";
-const robotPositionPath = "/todo/RobotPosition";
-const robotAnglePath = "/todo/RobotAngle";
+
+const robotXPositionPath = "/DriverStationInterface/RobotX";
+const robotYPositionPath = "/DriverStationInterface/RobotY";
+const robotAnglePath = "/DriverStationInterface/RobotRotation";
+
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
 const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
 
@@ -104,15 +107,16 @@ function createNTTopicRef<T>(topicPath: string, defaultValue: T, transform?: (v:
     return state as Ref<T>;
 }
 
-const stringToPoint = (s: string) => {
-    const components = s.split(",");
-    return new Point(parseFloat(components[0]), parseFloat(components[1]));
-};
-
 export let selectedBranch: Ref<string> = createNTTopicRef(selectedBranchPath, "None");
 export let selectedLevel: Ref<number> = createNTTopicRef(selectedLevelPath, 0, (level) => parseInt(level.substring(1)));
 
-let robotPosition: Ref<Point> = createNTTopicRef(robotPositionPath, new Point(6, 3.5), stringToPoint);
+let robotXPosition: Ref<number> = createNTTopicRef(robotXPositionPath, 0.0, parseFloat);
+let robotYPosition: Ref<number> = createNTTopicRef(robotYPositionPath, 0.0, parseFloat);
+let robotPosition: Ref<Point> = computed(() => new Point(
+    robotXPosition.value,
+    robotYPosition.value
+));
+
 let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Number);
 let currentAlliance: Ref<AllianceColor> = createNTTopicRef(isRedAlliancePath, "red", (v) => v === "true" ? "red" : "blue");
 

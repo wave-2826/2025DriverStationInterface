@@ -17,7 +17,7 @@ const DRAW_STYLIZED = true;
 const OUTLINE_COLOR = new Color("black");
 const OUTLINE_THICKNESS = 8;
 
-const DEBUG_SELECTION_BOUNDARIES = true;
+const DEBUG_SELECTION_BOUNDARIES = false;
 
 const BLUE_FIELD_REEF_LINE_OUTER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_OUTER_RADIUS);
 const BLUE_FIELD_REEF_LINE_INNER = createReefPerimeterHexagon(BLUE_FIELD_REEF_LINE_INNER_RADIUS);
