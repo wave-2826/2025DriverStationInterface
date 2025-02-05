@@ -117,7 +117,7 @@ let robotPosition: Ref<Point> = computed(() => new Point(
     robotYPosition.value
 ));
 
-let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, Number);
+let robotAngle: Ref<number> = createNTTopicRef(robotAnglePath, Math.PI / 4, (a) => parseFloat(a) - Math.PI / 2);
 let currentAlliance: Ref<AllianceColor> = createNTTopicRef(isRedAlliancePath, "red", (v) => v === "true" ? "red" : "blue");
 
 export let selectedAuto = createNTTopicRef(selectedAutoPath, "None");

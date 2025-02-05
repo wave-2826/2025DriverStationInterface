@@ -9,6 +9,7 @@ use simple_mdns::sync_discovery::OneShotMdnsResolver;
 use crate::{networktables::{self, Client, Config, Subscription, SubscriptionOptions}, AppState};
 
 static NT_API_PORT: u16 = 5809;
+static PERIODIC_DURATION_MS: Option<f64> = Some(0.04);
 
 #[derive(TS, Serialize, Deserialize, Clone)]
 #[ts(export)]
@@ -180,6 +181,7 @@ impl NtClientThread {
             }
 
             let new_subscription = client.subscribe_w_options(&topics, Some(SubscriptionOptions {
+                periodic: PERIODIC_DURATION_MS,
                 ..Default::default()
             })).await;
 
@@ -252,6 +254,7 @@ impl NtClientThread {
                 let subscription = client.subscribe_w_options(
                     &subscribed_topics,
                     Some(SubscriptionOptions {
+                        periodic: PERIODIC_DURATION_MS,
                         ..Default::default()
                     })
                 ).await;
