@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { drawField, mouseDown, mouseMove, mouseUp } from "../lib/rendering";
+import { drawField, touchStartOrMove, mouseMove } from "../lib/rendering";
 
 const canvasRef = useTemplateRef("canvas");
 let ctx: CanvasRenderingContext2D | null = null;
@@ -36,17 +36,17 @@ function draw(elapsed: number) {
     if(running) requestAnimationFrame(draw);
 }
 
-function onMouseDown(event: MouseEvent) {
+function onTouchStart(event: TouchEvent) {
     if(!canvasRef.value) return;
-    mouseDown(event, canvasRef.value);
+    touchStartOrMove(event, canvasRef.value);
+}
+function onTouchMove(event: TouchEvent) {
+    if(!canvasRef.value) return;
+    touchStartOrMove(event, canvasRef.value);
 }
 function onMouseMove(event: MouseEvent) {
     if(!canvasRef.value) return;
     mouseMove(event, canvasRef.value);
-}
-function onMouseUp(event: MouseEvent) {
-    if(!canvasRef.value) return;
-    mouseUp(event, canvasRef.value);
 }
 
 onMounted(() => {
@@ -64,8 +64,8 @@ onMounted(() => {
         return;
     }
 
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("touchstart", onTouchStart);
+    canvas.addEventListener("touchmove", onTouchMove);
     canvas.addEventListener("mousemove", onMouseMove);
 
     requestAnimationFrame(draw);
@@ -78,8 +78,8 @@ onUnmounted(() => {
     const canvas = canvasRef.value!;
     if(canvas === null) return;
     
-    canvas.removeEventListener("mousedown", onMouseDown);
-    canvas.removeEventListener("mouseup", onMouseUp);
+    canvas.removeEventListener("touchstart", onTouchStart);
+    canvas.removeEventListener("touchmove", onTouchMove);
     canvas.removeEventListener("mousemove", onMouseMove);
 });
 </script>

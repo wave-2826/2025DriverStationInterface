@@ -57,11 +57,12 @@ let reefBranchSelections: SelectionRegion[] = REEF_BRANCH_SELECTIONS.map(r => ne
 let reefSelections: SelectionRegion[] = REEF_SELECTIONS.map(r => new SelectionRegion(r));
 
 let mousePosition: Point | null = null;
-let isMouseDown = false;
 
-export function mouseDown(event: MouseEvent, canvas: HTMLCanvasElement) {
-    isMouseDown = true;
-    mousePosition = new Point(event.offsetX, event.offsetY);
+export function touchStartOrMove(event: TouchEvent, canvas: HTMLCanvasElement) {
+    const touch = event.touches.item(event.touches.length - 1);
+    if(!touch) return;
+    const clientRect = canvas.getBoundingClientRect();
+    mousePosition = new Point(touch.clientX - clientRect.left, touch.clientY - clientRect.top);
 
     if(!mousePosition) return;
     
@@ -88,9 +89,6 @@ export function mouseDown(event: MouseEvent, canvas: HTMLCanvasElement) {
             region.onSelect();
         }
     }
-}
-export function mouseUp(_event: MouseEvent, _canvas: HTMLCanvasElement) {
-    isMouseDown = false;
 }
 export function mouseMove(event: MouseEvent, _canvas: HTMLCanvasElement) {
     mousePosition = new Point(event.offsetX, event.offsetY);
