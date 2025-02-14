@@ -58,14 +58,9 @@ let reefSelections: SelectionRegion[] = REEF_SELECTIONS.map(r => new SelectionRe
 
 let mousePosition: Point | null = null;
 
-export function touchStartOrMove(event: TouchEvent, canvas: HTMLCanvasElement) {
-    const touch = event.touches.item(event.touches.length - 1);
-    if(!touch) return;
-    const clientRect = canvas.getBoundingClientRect();
-    mousePosition = new Point(touch.clientX - clientRect.left, touch.clientY - clientRect.top);
-
+function selectAtMouse(canvas: HTMLCanvasElement) {
     if(!mousePosition) return;
-    
+        
     const branchTransform = getBranchTransform(canvas);
     for(const region of reefBranchSelections) {
         if(region.pointInRegion(mousePosition, branchTransform)) {
@@ -89,6 +84,22 @@ export function touchStartOrMove(event: TouchEvent, canvas: HTMLCanvasElement) {
             region.onSelect();
         }
     }
+}
+
+export function touchStartOrMove(event: TouchEvent, canvas: HTMLCanvasElement) {
+    for(let i = 0; i < event.touches.length; i++) {
+        const touch = event.touches.item(i);
+        if(!touch) return;
+
+        const clientRect = canvas.getBoundingClientRect();
+        mousePosition = new Point(touch.clientX - clientRect.left, touch.clientY - clientRect.top);
+
+        selectAtMouse(canvas);
+    }
+}
+export function mouseDown(event: MouseEvent, canvas: HTMLCanvasElement) {
+    mousePosition = new Point(event.offsetX, event.offsetY);
+    selectAtMouse(canvas);
 }
 export function mouseMove(event: MouseEvent, _canvas: HTMLCanvasElement) {
     mousePosition = new Point(event.offsetX, event.offsetY);
