@@ -16,6 +16,7 @@ const BRANCH_COLOR = new Color("#a70fb9");
 const DRAW_STYLIZED = true;
 const OUTLINE_COLOR = new Color("black");
 const OUTLINE_THICKNESS = 8;
+const BRANCH_BACKGROUND_COLOR = new Color("#292929");
 
 const DEBUG_SELECTION_BOUNDARIES = false;
 
@@ -308,6 +309,8 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, delt
     ctx.fillStyle = getFieldLineColor();
     ctx.fill("evenodd");
     ctx.globalCompositeOperation = "source-over";
+    
+    drawRobot(ctx, reefTransform);
 
     // If drawing stylized, we add an to the reef perimiter
     if(DRAW_STYLIZED) {
@@ -380,8 +383,6 @@ function drawReef(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, delt
             return reefTransform.lengthToWorldSpace(length);
         }
     }, deltaTime);
-    
-    drawRobot(ctx, reefTransform);
 }
 
 function getBranchTransform(canvas: HTMLCanvasElement): PathTransformation {
@@ -422,8 +423,20 @@ function getReefTransform(canvas: HTMLCanvasElement): PathTransformation {
     };
 }
 
+let branchBackgroundGradient: CanvasGradient;
+
 function drawReefBranch(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
     const branchTransform = getBranchTransform(canvas);
+
+    const backgroundWidth = branchTransform.lengthToScreenSpace(10);
+    if(!branchBackgroundGradient) {
+        branchBackgroundGradient = ctx.createLinearGradient(0, 0, backgroundWidth, 0);
+        branchBackgroundGradient.addColorStop(0, BRANCH_BACKGROUND_COLOR.rgbString);
+        branchBackgroundGradient.addColorStop(0.65, BRANCH_BACKGROUND_COLOR.rgbString);
+        branchBackgroundGradient.addColorStop(1, BRANCH_BACKGROUND_COLOR.transparentRgbString);
+    }
+    ctx.fillStyle = branchBackgroundGradient;
+    ctx.fillRect(0, 0, backgroundWidth, canvas.height);
 
     const reefBottomDraw: Point[] = DRAW_STYLIZED ? [
         new Point(-0.054, 0.498),

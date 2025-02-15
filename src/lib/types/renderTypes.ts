@@ -95,6 +95,9 @@ export class Color {
     get rgbString() {
         return `rgb(${this.r}, ${this.g}, ${this.b})`;
     }
+    get transparentRgbString() {
+        return `rgba(${this.r}, ${this.g}, ${this.b}, 0.0)`;
+    }
     
     adjustBrightness(brightness: number) {
         return new Color([this.r * brightness, this.g * brightness, this.b * brightness]);
