@@ -5,6 +5,7 @@ export enum IPAddressMode {
     mDNS,
     Localhost,
     Custom,
+    USB
 };
 
 const reactiveSettings: Record<string, Ref<any>> = {};

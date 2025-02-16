@@ -5,7 +5,10 @@ import { connected, latency_seconds as latencySeconds } from "./networkTables";
 
 <template>
     <div class="statusBar">
-        <span>Network Tables: {{ connected ? "Connected" : "Disconnected" }}</span>
+        <span>Network Tables:
+            <span v-if="connected" class="connected">Connected</span>
+            <span v-if="!connected" class="disconnected">Disconnected</span>
+        </span>
         
         <span v-if="teamNumber !== 0">Team {{ teamNumber }}</span>
         <span v-else class="invalid">Team number not set!</span>
@@ -27,6 +30,12 @@ import { connected, latency_seconds as latencySeconds } from "./networkTables";
 .statusBar span {
     font-size: 14px;
     flex: 1;
+}
+.connected {
+    color: #77ff99;
+}
+.disconnected {
+    color: #ff7777;
 }
 .statusBar span:nth-child(2) {
     text-align: center;

@@ -7,10 +7,10 @@ const ipAddressModes: {
     }
 } = {
     [IPAddressMode.Custom]: { label: "Custom" },
-    [IPAddressMode.DriverStation]: { label: "Driver Station" },
     [IPAddressMode.Localhost]: { label: "Localhost" },
     [IPAddressMode.TeamNumber]: { label: "Team number (10.##.##.2)" },
     [IPAddressMode.mDNS]: { label: "mDNS (roboRIO-####-FRC.local)" },
+    [IPAddressMode.USB]: { label: "USB (127.11.22.2)" },
 };
 
 function verifyIP(ip: string) {

@@ -55,7 +55,9 @@ pub enum IPAddressMode {
     #[allow(non_camel_case_types)]
     mDNS,
     Localhost,
-    Custom(String)
+    Custom(String),
+    #[serde(rename = "USB")]
+    USB
 }
 
 fn resolve_mdns(team_number: u16) -> Result<SocketAddr, String> {
@@ -84,6 +86,9 @@ impl IPAddressMode {
             IPAddressMode::Localhost => Ok(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::new(127, 0, 0, 1), 5810
             ))),
+            IPAddressMode::USB => Ok(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::new(127, 11, 22, 12), 5810
+            ))),
             IPAddressMode::TeamNumber => {
                 let first_digits = (team_number / 100) as u8;
                 let last_digits = (team_number % 100) as u8;
@@ -95,7 +100,7 @@ impl IPAddressMode {
             IPAddressMode::Custom(ip) => Ok(SocketAddr::V4(SocketAddrV4::new(
                 ip.parse::<Ipv4Addr>().map_err(|e| format!("Failed to parse IP address: {}", e))?,
                 5810
-            ))),
+            )))
         }
     }
 }
@@ -113,6 +118,7 @@ fn verify_ip_address_mode(ip_address_mode: &IPAddressMode) -> bool {
         IPAddressMode::TeamNumber => true,
         IPAddressMode::mDNS => true,
         IPAddressMode::Localhost => true,
+        IPAddressMode::USB => true,
         IPAddressMode::Custom(ip) => ip.parse::<std::net::Ipv4Addr>().is_ok()
     }
 }

@@ -29,6 +29,7 @@ function updateNetworking() {
         [IPAddressMode.mDNS]: { type: "mDNS" },
         [IPAddressMode.Localhost]: { type: "localhost" },
         [IPAddressMode.Custom]: { type: "custom", value: ipAddress },
+        [IPAddressMode.USB]: { type: "USB" }
     } as const)[ipAddressMode.value];
   
     const NTUpdateChannel = new Channel<NTUpdateMessage>();
