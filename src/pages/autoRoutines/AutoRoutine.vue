@@ -57,12 +57,9 @@ function rotate(cx: number, cy: number, x: number, y: number, angle: number) {
     const ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
     return [nx, ny];
 }
-const rotatePoint = (center: Point, rotation: number, reference: Point) => {
+const rotatePoint = (center: Point, rotation: number, reference: Point): Point => {
     const point = rotate(center.x, center.y, reference.x + center.x, reference.y + center.y, rotation);
-    return {
-        x: point[0],
-        y: point[1]
-    };
+    return new Point(point[0], point[1]);
 };
 
 onMounted(() => {
@@ -137,10 +134,10 @@ onMounted(() => {
             const length = robotLength / 2 - lineWidthMeters / 2;
             const width = robotWidth / 2 - lineWidthMeters / 2;
             const points = [
-                fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: width })),
-                fieldPosToPixelPos(rotatePoint(center, rotation, { x: length, y: -width })),
-                fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: -width })),
-                fieldPosToPixelPos(rotatePoint(center, rotation, { x: -length, y: width }))
+                fieldPosToPixelPos(rotatePoint(center, rotation, new Point(length, width))),
+                fieldPosToPixelPos(rotatePoint(center, rotation, new Point(length, -width))),
+                fieldPosToPixelPos(rotatePoint(center, rotation, new Point(-length, -width))),
+                fieldPosToPixelPos(rotatePoint(center, rotation, new Point(-length, width)))
             ];
             autoCtx.moveTo(points[0].x, points[0].y);
             for(let i = 0; i < points.length; i++) {
