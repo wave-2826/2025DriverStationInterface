@@ -8,7 +8,6 @@ let ntClient: NetworkTables = NetworkTables.getInstanceByTeam(1);
 let topics: { [key: string]: NetworkTablesTopic<any> } = {};
 
 ntClient.addRobotConnectionListener((newConnected) => {
-    console.log("Robot connection state changed: ", newConnected);
     connected.value = newConnected;
 });
 
@@ -28,7 +27,9 @@ function updateNetworking() {
             break;
         }
         case IPAddressMode.TeamNumber: {
-            uri = `10.${team / 100}.${team % 100}.2`;
+            const teamStart = Math.floor(team / 100);
+            const teamEnd = team % 100;
+            uri = `10.${teamStart}.${teamEnd}.2`;
             break;
         }
         case IPAddressMode.Custom: {
