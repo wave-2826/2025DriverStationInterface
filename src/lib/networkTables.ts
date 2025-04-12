@@ -11,62 +11,58 @@ ntClient.addRobotConnectionListener((newConnected) => {
     connected.value = newConnected;
 });
 
-setInterval(updateLatency, 1000 / 10);
+// setInterval(updateLatency, 1000 / 10);
 
 export const connected = ref(false);
 export const latency_seconds = ref(0.0);
   
-function updateNetworking() {
+export function getURI(): string {
     const ipAddress = customIPAddress.value;
     const team = teamNumber.value;
   
-    let uri: string;
     switch(ipAddressMode.value) {
         case IPAddressMode.Localhost: {
-            uri = "localhost";
-            break;
+            return "localhost";
         }
         case IPAddressMode.TeamNumber: {
             const teamStart = Math.floor(team / 100);
             const teamEnd = team % 100;
-            uri = `10.${teamStart}.${teamEnd}.2`;
-            break;
+            return `10.${teamStart}.${teamEnd}.2`;
         }
         case IPAddressMode.Custom: {
-            uri = ipAddress;
-            break;
+            return ipAddress;
         }
         case IPAddressMode.USB: {
-            uri = "127.11.22.12";
-            break;
+            return "127.11.22.12";
         }
         case IPAddressMode.mDNS: {
-            uri = `roboRIO-${teamNumber}-FRC.local`;
-            break;
+            return `roboRIO-${teamNumber}-FRC.local`;
         }
         default: {
             let _exhaustiveCheck: never = ipAddressMode.value;
             console.log("Unknown IP address mode: ", _exhaustiveCheck);
-            return;
+            return "";
         }
     }
+}
 
+function updateNetworking() {
     try {
-        ntClient.changeURI(uri);
+        ntClient.changeURI(getURI());
     } catch(e) {
         console.error("Failed to connect to network tables: ", e);
     }
 }
 
-function updateLatency() {
-    if(ntClient == null) return;
+// function updateLatency() {
+//     if(ntClient == null) return;
     
-    // Measure latency -- This is super hacky since getServerTime is private, but I like the latency numbers :)
-    const serverTime = ntClient.client.messenger.socket["getServerTime"]();
-    const latencyMicros = performance.now() * 1000 - serverTime;
-    const latencySeconds = latencyMicros / 1e6;
-    latency_seconds.value = latencySeconds;
-}
+//     // Measure latency -- This is super hacky since getServerTime is private, but I like the latency numbers :)
+//     const serverTime = ntClient.client.messenger.socket["getServerTime"]();
+//     const latencyMicros = performance.now() * 1000 - serverTime;
+//     const latencySeconds = latencyMicros / 1e6;
+//     latency_seconds.value = latencySeconds;
+// }
 
 watch(teamNumber, updateNetworking);
 watch(customIPAddress, updateNetworking);
@@ -83,12 +79,13 @@ updateNetworking();
  * @param transform 
  * @returns 
  */
-function createNTTopicRef<NTValueType extends NetworkTablesTypes, RefValueType = NTValueType>(
+async function createNTTopicRef<NTValueType extends NetworkTablesTypes, RefValueType = NTValueType>(
     topicPath: string,
     type: NetworkTablesTypeInfo,
     defaultValue: NTValueType,
-    transform?: (value: NTValueType) => RefValueType
-): Ref<RefValueType> {
+    transform?: (value: NTValueType) => RefValueType,
+    publishing?: boolean
+): Promise<Ref<RefValueType>> {
     if(transform == null) {
         transform = (v) => v as unknown as RefValueType
     }
@@ -97,6 +94,13 @@ function createNTTopicRef<NTValueType extends NetworkTablesTypes, RefValueType =
     let topic = topics[topicPath];
     if(topic == null) {
         topic = ntClient.createTopic<NTValueType>(topicPath, type, defaultValue);
+        
+        if(publishing) await topic.publish({
+            cached: false,
+            persistent: false,
+            retained: true
+        });
+
         topics[topicPath] = topic;
     }
 
@@ -107,16 +111,14 @@ function createNTTopicRef<NTValueType extends NetworkTablesTypes, RefValueType =
     return value;
 }
 
-async function setValue<NTValueTYpe extends NetworkTablesTypes>(topicPath: string, value: NTValueTYpe) {
+async function setValue<NTValueType extends NetworkTablesTypes>(topicPath: string, value: NTValueType) {
     const topic = topics[topicPath];
     if(topic == null) {
         console.error("Cannot set value of non-existent topic: ", topicPath);
         return;
     }
     
-    await topic.publish();
     topic.setValue(value);
-    await topic.unpublish();
 }
 
 const selectedBranchPath = "/DriverStationInterface/ReefBranch";
@@ -129,24 +131,25 @@ const robotAnglePath = "/DriverStationInterface/RobotRotation";
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
 const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
 
-export let selectedBranch = createNTTopicRef<string>(selectedBranchPath, NetworkTablesTypeInfos.kString, "None");
-export let selectedLevel = createNTTopicRef<string, number>(
+export let selectedBranch = await createNTTopicRef<string>(selectedBranchPath, NetworkTablesTypeInfos.kString, "None", undefined, true);
+export let selectedLevel = await createNTTopicRef<string, number>(
     selectedLevelPath,
     NetworkTablesTypeInfos.kString, "0",
-    (level) => parseInt(level.substring(1))
+    (level) => parseInt(level.substring(1)),
+    true
 );
 
-let robotXPosition = createNTTopicRef<number>(robotXPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
-let robotYPosition = createNTTopicRef<number>(robotYPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
+let robotXPosition = await createNTTopicRef<number>(robotXPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
+let robotYPosition = await createNTTopicRef<number>(robotYPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
 let robotPosition: Ref<Point> = computed(() => new Point(
     robotXPosition.value,
     robotYPosition.value
 ));
 
-let robotAngle = createNTTopicRef<number>(robotAnglePath, NetworkTablesTypeInfos.kDouble, Math.PI / 4, (a) => a - Math.PI / 2);
-let currentAlliance = createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, NetworkTablesTypeInfos.kBoolean, false, v => v ? "red" : "blue");
+let robotAngle = await createNTTopicRef<number>(robotAnglePath, NetworkTablesTypeInfos.kDouble, Math.PI / 4, (a) => a - Math.PI / 2);
+let currentAlliance = await createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, NetworkTablesTypeInfos.kBoolean, false, v => v ? "red" : "blue");
 
-export let selectedAuto = createNTTopicRef<string>(selectedAutoPath, NetworkTablesTypeInfos.kString, "None");
+export let selectedAuto = await createNTTopicRef<string>(selectedAutoPath, NetworkTablesTypeInfos.kString, "None", undefined, true);
 
 /** Sets the currently-selected autonomous routine. */
 export function setSelectedAuto(auto: string) {

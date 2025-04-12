@@ -3,8 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { Point } from '../lib/types/renderTypes';
 import { AutoDataAPIResponse, AutoPose, AutoRoutine } from '../lib/types/autoTypes';
 import AutoRoutineComponent from "./autoRoutines/AutoRoutine.vue";
-import { selectedAuto } from '../lib/networkTables';
-import { invoke } from '@tauri-apps/api/core';
+import { getURI, selectedAuto } from '../lib/networkTables';
 
 let isBlue = ref(true);
 let columnsShown = ref(2);
@@ -13,19 +12,10 @@ let loadError = ref<string | null>(null);
 
 let autos = ref<AutoRoutine[]>([]);
 
-// function autoDataChanged(key, value, isNew) {
-//     for(const autoChoice of autoChoices) {
-//         selectPathButton.onclick = () => {
-//             if(!isNTConnected) return;
-//             NetworkTables.putValue(selectedAutoPath, autoChoice.name);
-//         };
-//     }
-// }
-
 async function fetchAutoData() {
     let apiAddress = "";
     try {
-        apiAddress = await invoke("get_api_address");
+        apiAddress = getURI();
     } catch(e) {
         loadError.value = "Could not get API address";
         return;
