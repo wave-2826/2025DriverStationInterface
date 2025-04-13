@@ -138,7 +138,7 @@ function formatTime(time: number) {
 }
 function drawMatchTime(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     let color = "white";
-    let climbSmoothIn = Math.min(1, Math.max(0, matchTime.value - 15) / 5);
+    let climbSmoothIn = Math.min(1, Math.max(0, matchTime.value - 19) / 1);
     if(matchTime.value < 0) {
         climbSmoothIn = 1;
     }
