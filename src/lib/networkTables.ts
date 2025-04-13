@@ -2,16 +2,7 @@ import { computed, Ref, ref, watch } from "vue";
 import { Point } from "./types/renderTypes";
 import { AllianceColor } from "./types/autoTypes";
 import { customIPAddress, IPAddressMode, ipAddressMode, teamNumber } from "./settings";
-import { NetworkTables, NetworkTablesTopic, NetworkTablesTypeInfo, NetworkTablesTypeInfos, NetworkTablesTypes } from 'ntcore-ts-client';
-
-let ntClient: NetworkTables = NetworkTables.getInstanceByTeam(1);
-let topics: { [key: string]: NetworkTablesTopic<any> } = {};
-
-ntClient.addRobotConnectionListener((newConnected) => {
-    connected.value = newConnected;
-});
-
-// setInterval(updateLatency, 1000 / 10);
+import { Nt4Client, Nt4Topic } from "./nt4";
 
 export const connected = ref(false);
 export const latency_seconds = ref(0.0);
@@ -36,7 +27,7 @@ export function getURI(): string {
             return "127.11.22.12";
         }
         case IPAddressMode.mDNS: {
-            return `roboRIO-${teamNumber}-FRC.local`;
+            return `roboRIO-${team}-FRC.local`;
         }
         default: {
             let _exhaustiveCheck: never = ipAddressMode.value;
@@ -46,29 +37,65 @@ export function getURI(): string {
     }
 }
 
-function updateNetworking() {
+let ntClient: Nt4Client | null = null;
+
+let topics: { [key: string]: {
+    path: string,
+    transform: (value: any) => any,
+    defaultValue: any,
+    ref: Ref<any>,
+    publishing: boolean
+} } = {};
+
+
+function updateLatency() {
+    if(ntClient == null) return;
+    
+    latency_seconds.value = (ntClient.getLatencyMs() ?? 0) / 1000;
+}
+setInterval(updateLatency, 1000 / 10);
+
+async function updateNetworking() {
     try {
-        ntClient.changeURI(getURI());
+        if(ntClient !== null) {
+            ntClient.disconnect();
+            return;
+        }
+
+        function onConnect() {
+            console.log("Connected to network tables!");
+            connected.value = true;
+        }
+        function onDisconnect() {
+            console.log("Disconnected from network tables!");
+            connected.value = false;
+        }
+        
+        ntClient = new Nt4Client(getURI(), "WaveDSInterface", (topic: Nt4Topic) => {
+            // On topic announced
+            console.log("Topic announced: ", topic.name);
+        }, (topic: Nt4Topic) => {
+            // On topic unannounced
+            console.log("Topic unannounced: ", topic.name);
+        }, (topic: Nt4Topic, _timestamp_us: number, value: unknown) => {
+            // On new topic data
+            const topicRef = topics[topic.name];
+            if(topicRef == null) return;
+
+            const newValue = topicRef.transform(value);
+            if(newValue !== topicRef.ref.value) {
+                topicRef.ref.value = newValue;
+            }
+        }, onConnect, onDisconnect);
+
+        ntClient.subscribeAll(Object.values(topics).map(t => t.path), false);
+
+        console.log("Connecting to network tables at ", getURI());
+        ntClient.connect();
     } catch(e) {
         console.error("Failed to connect to network tables: ", e);
     }
 }
-
-// function updateLatency() {
-//     if(ntClient == null) return;
-    
-//     // Measure latency -- This is super hacky since getServerTime is private, but I like the latency numbers :)
-//     const serverTime = ntClient.client.messenger.socket["getServerTime"]();
-//     const latencyMicros = performance.now() * 1000 - serverTime;
-//     const latencySeconds = latencyMicros / 1e6;
-//     latency_seconds.value = latencySeconds;
-// }
-
-watch(teamNumber, updateNetworking);
-watch(customIPAddress, updateNetworking);
-watch(ipAddressMode, updateNetworking);
-
-updateNetworking();
 
 /**
  * Creates a NetworkTables topic reference that will automatically update when the value changes.  
@@ -79,46 +106,47 @@ updateNetworking();
  * @param transform 
  * @returns 
  */
-async function createNTTopicRef<NTValueType extends NetworkTablesTypes, RefValueType = NTValueType>(
+async function createNTTopicRef<NTValueType, RefValueType = NTValueType>(
     topicPath: string,
-    type: NetworkTablesTypeInfo,
     defaultValue: NTValueType,
-    transform?: (value: NTValueType) => RefValueType,
-    publishing?: boolean
+    transform?: ((value: any) => RefValueType) | null
 ): Promise<Ref<RefValueType>> {
     if(transform == null) {
         transform = (v) => v as unknown as RefValueType
     }
 
-    let value: Ref<RefValueType> = ref(transform(defaultValue)) as Ref<RefValueType>; // I'm not sure why this is necessary, but it is.
-    let topic = topics[topicPath];
-    if(topic == null) {
-        topic = ntClient.createTopic<NTValueType>(topicPath, type, defaultValue);
-        
-        if(publishing) await topic.publish({
-            cached: false,
-            persistent: false,
-            retained: true
-        });
-
-        topics[topicPath] = topic;
+    if(topics[topicPath] == null) {
+        let value: Ref<RefValueType> = ref(transform(defaultValue)) as Ref<RefValueType>;
+        topics[topicPath] = {
+            path: topicPath,
+            transform: transform ?? ((v) => v as unknown as RefValueType),
+            defaultValue,
+            ref: value,
+            publishing: false
+        };
     }
 
-    topic.subscribe((newValue) => {
-        value.value = transform(newValue as NTValueType);
-    });
-
-    return value;
+    return topics[topicPath].ref;
 }
 
-async function setValue<NTValueType extends NetworkTablesTypes>(topicPath: string, value: NTValueType) {
-    const topic = topics[topicPath];
-    if(topic == null) {
-        console.error("Cannot set value of non-existent topic: ", topicPath);
+async function setValue<NTValueType>(topicPath: string, typeName: string, value: NTValueType) {
+    if(ntClient === null) return;
+
+    if(!topics[topicPath]) {
+        console.error("Topic not found: ", topicPath);
         return;
     }
-    
-    topic.setValue(value);
+
+    const topic = topics[topicPath];
+    if(!topic.publishing) {
+        ntClient.publishNewTopic(topicPath, typeName);
+        ntClient.setRetained(topicPath, true);
+    }
+
+    ntClient.addSample(topicPath, value);
+
+    topic.ref.value = topic.transform(value);
+    topic.publishing = true;
 }
 
 const selectedBranchPath = "/DriverStationInterface/ReefBranch";
@@ -127,43 +155,51 @@ const selectedLevelPath = "/DriverStationInterface/ReefLevel";
 const robotXPositionPath = "/DriverStationInterface/RobotX";
 const robotYPositionPath = "/DriverStationInterface/RobotY";
 const robotAnglePath = "/DriverStationInterface/RobotRotation";
+const matchTimePatch = "/DriverStationInterface/MatchTime";
 
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
 const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
 
-export let selectedBranch = await createNTTopicRef<string>(selectedBranchPath, NetworkTablesTypeInfos.kString, "None", undefined, true);
+export let selectedBranch = await createNTTopicRef<string>(selectedBranchPath, "A");
 export let selectedLevel = await createNTTopicRef<string, number>(
     selectedLevelPath,
-    NetworkTablesTypeInfos.kString, "0",
-    (level) => parseInt(level.substring(1)),
-    true
+    "L1",
+    (level) => parseInt(level.substring(1))
 );
 
-let robotXPosition = await createNTTopicRef<number>(robotXPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
-let robotYPosition = await createNTTopicRef<number>(robotYPositionPath, NetworkTablesTypeInfos.kDouble, 0.0);
+let robotXPosition = await createNTTopicRef<number>(robotXPositionPath, 0.0);
+let robotYPosition = await createNTTopicRef<number>(robotYPositionPath, 0.0);
 let robotPosition: Ref<Point> = computed(() => new Point(
     robotXPosition.value,
     robotYPosition.value
 ));
 
-let robotAngle = await createNTTopicRef<number>(robotAnglePath, NetworkTablesTypeInfos.kDouble, Math.PI / 4, (a) => a - Math.PI / 2);
-let currentAlliance = await createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, NetworkTablesTypeInfos.kBoolean, false, v => v ? "red" : "blue");
+let robotAngle = await createNTTopicRef<number>(robotAnglePath, Math.PI / 4, (a) => a - Math.PI / 2);
+let currentAlliance = await createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, false, v => v ? "red" : "blue");
 
-export let selectedAuto = await createNTTopicRef<string>(selectedAutoPath, NetworkTablesTypeInfos.kString, "None", undefined, true);
+export let selectedAuto = await createNTTopicRef<string>(selectedAutoPath, "None", null);
+
+export let matchTime = await createNTTopicRef<number>(matchTimePatch, -1);
+
+watch(teamNumber, updateNetworking);
+watch(customIPAddress, updateNetworking);
+watch(ipAddressMode, updateNetworking);
+
+updateNetworking();
 
 /** Sets the currently-selected autonomous routine. */
 export function setSelectedAuto(auto: string) {
-    setValue<string>(selectedAutoPath, auto);
+    setValue<string>(selectedAutoPath, "string", auto);
 }
 
 /** Sets the currently-selected branch. */
 export function setSelectedBranch(branch: string) {
-    setValue<string>(selectedBranchPath, branch);
+    setValue<string>(selectedBranchPath, "string", branch);
 }
 
 /** Sets the currently-selected level. */
 export function setSelectedLevel(level: number) {
-    setValue<string>(selectedLevelPath, `L${level.toString()}`);
+    setValue<string>(selectedLevelPath, "string", `L${level.toString()}`);
 }
 
 /** Gets the currently-selected autonomous routine as a ref. */

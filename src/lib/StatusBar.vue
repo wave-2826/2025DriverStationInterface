@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { teamNumber } from "../lib/settings";
-import { connected/*, latency_seconds as latencySeconds*/ } from "./networkTables";
+import { connected, latency_seconds as latencySeconds } from "./networkTables";
 </script>
 
 <template>
@@ -13,8 +13,8 @@ import { connected/*, latency_seconds as latencySeconds*/ } from "./networkTable
         <span v-if="teamNumber !== 0">Team {{ teamNumber }}</span>
         <span v-else class="invalid">Team number not set!</span>
 
-        <!-- <span>Latency: {{ (latencySeconds * 1000).toFixed(2) }}ms</span> -->
-        <span>*</span>
+        <span>Latency: {{ (latencySeconds * 1000).toFixed(2) }}ms</span>
+        <!-- <span>*</span> -->
     </div>
 </template>
 

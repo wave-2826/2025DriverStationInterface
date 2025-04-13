@@ -63,6 +63,9 @@ const COLOR_NAMES: Record<string, string> = {
 };
 
 export class Color {
+    public static WHITE = new Color("#ffffff");
+    public static BLACK = new Color("#000000");
+    
     readonly r: number;
     readonly g: number;
     readonly b: number;

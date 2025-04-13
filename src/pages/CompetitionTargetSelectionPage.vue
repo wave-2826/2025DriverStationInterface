@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { drawField, touchStartOrMove, mouseDown, mouseMove } from "../lib/rendering";
+import { drawAll, touchStartOrMove, mouseDown, mouseMove } from "../lib/rendering";
 
 const canvasRef = useTemplateRef("canvas");
 let ctx: CanvasRenderingContext2D | null = null;
@@ -31,7 +31,7 @@ function draw(elapsed: number) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    drawField(ctx, canvas, delta);
+    drawAll(ctx, canvas, delta);
 
     if(running) requestAnimationFrame(draw);
 }

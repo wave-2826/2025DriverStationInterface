@@ -8,7 +8,7 @@ import {
     REEF_BRANCH_SELECTIONS, REEF_BRANCH_WIDTH,
     REEF_SELECTIONS
 } from "./constants/fieldConstants";
-import { getCurrentAlliance, getRobotAngle, getRobotPosition } from "./networkTables";
+import { getCurrentAlliance, getRobotAngle, getRobotPosition, matchTime } from "./networkTables";
 import { Color, PathSegment, PathTransformation, Point, SelectionRegion } from "./types/renderTypes";
 import { robotBumperWidth, robotLength, robotWidth } from "./constants/robotConstants";
 
@@ -17,6 +17,8 @@ const DRAW_STYLIZED = true;
 const OUTLINE_COLOR = new Color("black");
 const OUTLINE_THICKNESS = 8;
 const BRANCH_BACKGROUND_COLOR = new Color("#292929");
+const CLIMB_WARNING_COLOR_1 = new Color("#ff0000");
+const CLIMB_WARNING_COLOR_2 = new Color("#ff6666");
 
 const DEBUG_SELECTION_BOUNDARIES = false;
 
@@ -122,9 +124,46 @@ function createReefPerimeterHexagon(size: number) {
     return points;
 }
 
-export function drawField(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
+export function drawAll(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, deltaTime: number) {
     drawReef(ctx, canvas, deltaTime);
     drawReefBranch(ctx, canvas, deltaTime);
+    drawMatchTime(ctx, canvas);
+}
+
+function formatTime(time: number) {
+    if(time < 0) return "0:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+function drawMatchTime(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+    let color = "white";
+    let climbSmoothIn = Math.min(1, Math.max(0, matchTime.value - 15) / 5);
+    if(matchTime.value < 0) {
+        climbSmoothIn = 1;
+    }
+
+    if(matchTime.value < 20) {
+        color = CLIMB_WARNING_COLOR_1.lerp(CLIMB_WARNING_COLOR_2, Math.sin(Date.now() / 100) * 0.5 + 0.5).lerp(Color.WHITE, climbSmoothIn).rgbString;
+    }
+
+    let climbBannerHeight = 50;
+    let climbBannerOffset = -climbSmoothIn * climbBannerHeight;
+
+    drawText(ctx, formatTime(matchTime.value), `5rem RazerBlackWidow`, canvas.width * 0.5, 60 + climbBannerOffset + climbBannerHeight, color);
+
+    const gradientOffset = (Date.now() / 400) % 1;
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(gradientOffset % 1, "#ffcc00");
+    gradient.addColorStop((gradientOffset + 0.5) % 1, "#ff9900");
+    gradient.addColorStop((gradientOffset + 1) % 1, "#ffcc00");
+    ctx.fillStyle = gradient;
+
+    ctx.fillRect(0, climbBannerOffset, canvas.width, climbBannerHeight);
+
+    ctx.textBaseline = "middle";
+    drawText(ctx, "CLIMB!", `${climbBannerHeight * 0.75}px RazerBlackWidow`, canvas.width * 0.5, climbBannerOffset + climbBannerHeight / 2 + 5, "white", "center");
+    ctx.textBaseline = "alphabetic";
 }
 
 function drawPath(path: PathSegment[], ctx: CanvasRenderingContext2D, width: number, color: Color, expand: number, transform: PathTransformation, inSegments = true) {
@@ -482,15 +521,19 @@ function drawSelectionRegions(regions: SelectionRegion[], ctx: CanvasRenderingCo
             ctx.stroke();
         }
 
-        ctx.fillStyle = region.labelColor;
-        ctx.strokeStyle = OUTLINE_COLOR.rgbString;
-        ctx.lineWidth = 14;
-        ctx.textBaseline = "middle";
-        ctx.font = region.font(transform);
-        ctx.textAlign = region.labelAlign;
-
         const position = region.labelPosition(transform);
-        ctx.strokeText(region.label, position.x, position.y);
-        ctx.fillText(region.label, position.x, position.y);
+        drawText(ctx, region.label, region.font(transform), position.x, position.y, region.labelColor, region.labelAlign);
     }
+}
+
+function drawText(ctx: CanvasRenderingContext2D, label: string, font: string, x: number, y: number, color: string = "white", labelAlign: CanvasTextAlign = "center") {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = OUTLINE_COLOR.rgbString;
+    ctx.lineWidth = 14;
+    ctx.textBaseline = "middle";
+    ctx.font = font;
+    ctx.textAlign = labelAlign;
+
+    ctx.strokeText(label, x, y);
+    ctx.fillText(label, x, y);
 }

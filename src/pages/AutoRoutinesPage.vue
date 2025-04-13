@@ -10,7 +10,32 @@ let columnsShown = ref(2);
 let titleSize = computed(() => `${2.734 * (0.8 ** columnsShown.value)}rem`);
 let loadError = ref<string | null>(null);
 
-let autos = ref<AutoRoutine[]>([]);
+function getCachedAutoData() {
+    const cachedData = localStorage.getItem("autoData");
+    if(cachedData) {
+        try {
+            return parseAutoData(JSON.parse(cachedData) as AutoDataAPIResponse);
+        } catch(e) {
+            console.error("Error parsing cached auto data:", e);
+        }
+    }
+    return [] as AutoRoutine[];
+}
+function setCachedAutoData(data: AutoDataAPIResponse) {
+    localStorage.setItem("autoData", JSON.stringify(data));
+}
+function parseAutoData(data: AutoDataAPIResponse) {
+    return data.autoChoices.map(choice => new AutoRoutine(
+        choice.name,
+        choice.poses.map(pose => new AutoPose(
+            new Point(pose.x, pose.y),
+            pose.rot,
+            pose.t
+        ))
+    ));
+}
+
+let autos = ref<AutoRoutine[]>(getCachedAutoData());
 
 async function fetchAutoData() {
     let apiAddress = "";
@@ -23,21 +48,15 @@ async function fetchAutoData() {
 
     try {
         console.log("Fetching auto data from", apiAddress);
-        const response = await fetch(`http://${apiAddress}/autoData`);
+        const response = await fetch(`http://${apiAddress}:5809/autoData`);
         if(!response.ok) {
             loadError.value = `HTTP error: ${response.status}`;
             return;
         }
         const data: AutoDataAPIResponse = await response.json();
 
-        autos.value = data.autoChoices.map(choice => new AutoRoutine(
-            choice.name,
-            choice.poses.map(pose => new AutoPose(
-                new Point(pose.x, pose.y),
-                pose.rot,
-                pose.t
-            ))
-        ));
+        setCachedAutoData(data);
+        autos.value = parseAutoData(data);
     } catch(e: any) {
         loadError.value = e.toString();
     }
