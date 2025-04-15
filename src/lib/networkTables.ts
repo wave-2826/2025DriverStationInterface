@@ -106,11 +106,11 @@ async function updateNetworking() {
  * @param transform 
  * @returns 
  */
-async function createNTTopicRef<NTValueType, RefValueType = NTValueType>(
+function createNTTopicRef<NTValueType, RefValueType = NTValueType>(
     topicPath: string,
     defaultValue: NTValueType,
     transform?: ((value: any) => RefValueType) | null
-): Promise<Ref<RefValueType>> {
+): Ref<RefValueType> {
     if(transform == null) {
         transform = (v) => v as unknown as RefValueType
     }
@@ -155,31 +155,33 @@ const selectedLevelPath = "/DriverStationInterface/ReefLevel";
 const robotXPositionPath = "/DriverStationInterface/RobotX";
 const robotYPositionPath = "/DriverStationInterface/RobotY";
 const robotAnglePath = "/DriverStationInterface/RobotRotation";
-const matchTimePatch = "/DriverStationInterface/MatchTime";
+const matchTimePath = "/DriverStationInterface/MatchTime";
+const robotStatePath = "/DriverStationInterface/RobotState";
 
 const isRedAlliancePath = "/FMSInfo/IsRedAlliance";
 const selectedAutoPath = "/SmartDashboard/Auto Choices/selected";
 
-export let selectedBranch = await createNTTopicRef<string>(selectedBranchPath, "A");
-export let selectedLevel = await createNTTopicRef<string, number>(
+export let selectedBranch = createNTTopicRef<string>(selectedBranchPath, "A");
+export let selectedLevel = createNTTopicRef<string, number>(
     selectedLevelPath,
     "L1",
     (level) => parseInt(level.substring(1))
 );
 
-let robotXPosition = await createNTTopicRef<number>(robotXPositionPath, 0.0);
-let robotYPosition = await createNTTopicRef<number>(robotYPositionPath, 0.0);
+let robotXPosition = createNTTopicRef<number>(robotXPositionPath, 0.0);
+let robotYPosition = createNTTopicRef<number>(robotYPositionPath, 0.0);
 let robotPosition: Ref<Point> = computed(() => new Point(
     robotXPosition.value,
     robotYPosition.value
 ));
 
-let robotAngle = await createNTTopicRef<number>(robotAnglePath, Math.PI / 4, (a) => a - Math.PI / 2);
-let currentAlliance = await createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, false, v => v ? "red" : "blue");
+let robotAngle = createNTTopicRef<number>(robotAnglePath, Math.PI / 4, (a) => a - Math.PI / 2);
+let currentAlliance = createNTTopicRef<boolean, AllianceColor>(isRedAlliancePath, false, v => v ? "red" : "blue");
 
-export let selectedAuto = await createNTTopicRef<string>(selectedAutoPath, "None", null);
+export let selectedAuto = createNTTopicRef<string>(selectedAutoPath, "None", null);
 
-export let matchTime = await createNTTopicRef<number>(matchTimePatch, -1);
+export let matchTime = createNTTopicRef<number>(matchTimePath, -1);
+export let robotState = createNTTopicRef<string>(robotStatePath, "Disabled");
 
 watch(teamNumber, updateNetworking);
 watch(customIPAddress, updateNetworking);

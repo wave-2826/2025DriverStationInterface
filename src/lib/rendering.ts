@@ -8,7 +8,7 @@ import {
     REEF_BRANCH_SELECTIONS, REEF_BRANCH_WIDTH,
     REEF_SELECTIONS
 } from "./constants/fieldConstants";
-import { getCurrentAlliance, getRobotAngle, getRobotPosition, matchTime } from "./networkTables";
+import { getCurrentAlliance, getRobotAngle, getRobotPosition, matchTime, robotState } from "./networkTables";
 import { Color, PathSegment, PathTransformation, Point, SelectionRegion } from "./types/renderTypes";
 import { robotBumperWidth, robotLength, robotWidth } from "./constants/robotConstants";
 
@@ -136,10 +136,15 @@ function formatTime(time: number) {
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+function ease(t: number) {
+    return t * t * (3 - 2 * t);
+}
 function drawMatchTime(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     let color = "white";
-    let climbSmoothIn = Math.min(1, Math.max(0, matchTime.value - 19) / 1);
-    if(matchTime.value < 0) {
+    let climbStartTime = 20;
+    let climbInterpolationTime = 0.5;
+    let climbSmoothIn = ease(Math.min(1, Math.max(0, (climbStartTime - matchTime.value) / climbInterpolationTime)));
+    if(matchTime.value < 0 || robotState.value !== "Teleop") {
         climbSmoothIn = 1;
     }
 
