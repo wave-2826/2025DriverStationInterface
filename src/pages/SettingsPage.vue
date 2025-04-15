@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { teamNumber, customIPAddress, ipAddressMode, IPAddressMode } from "../lib/settings";
+import { version } from "../../package.json";
 
 const ipAddressModes: {
     [mode in IPAddressMode]: {
@@ -27,6 +28,9 @@ function verifyIP(ip: string) {
 
 <template>
     <div class="page">
+        <span>Version: {{ version }}</span>
+        <br />
+        
         <h1>Network settings</h1>
 
         <div class="setting">
