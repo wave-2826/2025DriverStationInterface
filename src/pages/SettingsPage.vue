@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { teamNumber, customIPAddress, ipAddressMode, IPAddressMode } from "../lib/settings";
+import { teamNumber, climbWarningTime, customIPAddress, ipAddressMode, IPAddressMode } from "../lib/settings";
 import { version } from "../../package.json";
 
 const ipAddressModes: {
@@ -31,6 +31,12 @@ function verifyIP(ip: string) {
         <span>Version: {{ version }}</span>
         <br />
         
+        <h1>Gameplay</h1>
+        <div class="setting">
+            <label for="climbWarning">Climb warning time</label>
+            <input type="number" id="climbWarning" v-model.number="climbWarningTime" :class="{ 'error': climbWarningTime < 0 || !Number.isInteger(climbWarningTime) }" />
+        </div>
+
         <h1>Network settings</h1>
 
         <div class="setting">

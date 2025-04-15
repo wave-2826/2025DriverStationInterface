@@ -10,6 +10,7 @@ export enum IPAddressMode {
 
 const reactiveSettings: Record<string, Ref<any>> = {};
 
+export const climbWarningTime = getSetting("climbWarningTime", 20);
 export const teamNumber = getSetting("teamNumber", 0);
 export const customIPAddress = getSetting("customIP", "127.0.0.1");
 export const ipAddressMode = getSetting("ipAddressMode", IPAddressMode.TeamNumber);

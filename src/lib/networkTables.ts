@@ -59,7 +59,6 @@ async function updateNetworking() {
     try {
         if(ntClient !== null) {
             ntClient.disconnect();
-            return;
         }
 
         function onConnect() {

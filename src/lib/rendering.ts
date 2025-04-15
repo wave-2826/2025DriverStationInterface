@@ -8,9 +8,10 @@ import {
     REEF_BRANCH_SELECTIONS, REEF_BRANCH_WIDTH,
     REEF_SELECTIONS
 } from "./constants/fieldConstants";
-import { getCurrentAlliance, getRobotAngle, getRobotPosition, matchTime, robotState } from "./networkTables";
+import { connected, getCurrentAlliance, getRobotAngle, getRobotPosition, matchTime, robotState } from "./networkTables";
 import { Color, PathSegment, PathTransformation, Point, SelectionRegion } from "./types/renderTypes";
 import { robotBumperWidth, robotLength, robotWidth } from "./constants/robotConstants";
+import { climbWarningTime } from "./settings";
 
 const BRANCH_COLOR = new Color("#a70fb9");
 const DRAW_STYLIZED = true;
@@ -128,6 +129,14 @@ export function drawAll(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement
     drawReef(ctx, canvas, deltaTime);
     drawReefBranch(ctx, canvas, deltaTime);
     drawMatchTime(ctx, canvas);
+
+    if(!connected.value) {
+        ctx.fillStyle = "black";
+        ctx.globalAlpha = 0.5;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+        drawText(ctx, "Not Connected", "30px Arial", canvas.width / 2, canvas.height / 2, "white");
+    }
 }
 
 function formatTime(time: number) {
@@ -141,9 +150,8 @@ function ease(t: number) {
 }
 function drawMatchTime(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     let color = "white";
-    let climbStartTime = 20;
     let climbInterpolationTime = 0.5;
-    let climbSmoothIn = ease(Math.min(1, Math.max(0, (climbStartTime - matchTime.value) / climbInterpolationTime)));
+    let climbSmoothIn = ease(Math.min(1, Math.max(0, (climbWarningTime.value - matchTime.value) / climbInterpolationTime)));
     if(matchTime.value < 0 || robotState.value !== "Teleop") {
         climbSmoothIn = 1;
     }
