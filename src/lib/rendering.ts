@@ -151,7 +151,7 @@ function ease(t: number) {
 function drawMatchTime(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     let color = "white";
     let climbInterpolationTime = 0.5;
-    let climbSmoothIn = ease(Math.min(1, Math.max(0, (climbWarningTime.value - matchTime.value) / climbInterpolationTime)));
+    let climbSmoothIn = ease(Math.min(1, Math.max(0, (matchTime.value - climbWarningTime.value) / climbInterpolationTime)));
     if(matchTime.value < 0 || robotState.value !== "Teleop") {
         climbSmoothIn = 1;
     }
